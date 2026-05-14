@@ -1,0 +1,2396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Vinos Argentina</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #7B1F3A;
+  --primary-dark: #5a1629;
+  --primary-light: #f9f0f3;
+  --text: #1a0d11;
+  --text-muted: #6b5057;
+  --bg: #ffffff;
+  --bg-secondary: #faf7f8;
+  --border: #e8dde0;
+  --card: #ffffff;
+  --amber-bg: #fffbeb;
+  --amber-border: #fde68a;
+  --amber-text: #78350f;
+  --green-bg: #f0fdf4;
+  --green-border: #bbf7d0;
+  --green-text: #166534;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+  --red-text: #991b1b;
+  --radius: 10px;
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+body { font-family: var(--font-sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+header {
+  background: var(--primary);
+  color: white;
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.header-brand { display: flex; align-items: center; gap: .6rem; font-family: var(--font-serif); font-size: 1.2rem; font-weight: 700; }
+.header-brand svg { width: 22px; height: 22px; }
+.nav-tabs { display: flex; gap: 4px; background: rgba(255,255,255,.12); padding: 4px; border-radius: 8px; }
+.nav-tab {
+  padding: 5px 16px; border-radius: 6px; font-size: .85rem; font-weight: 500;
+  cursor: pointer; border: none; background: none; color: rgba(255,255,255,.75);
+  transition: all .15s;
+}
+.nav-tab:hover { color: white; background: rgba(255,255,255,.15); }
+.nav-tab.active { background: white; color: var(--primary); }
+
+.page { display: none; flex: 1; padding: 1.5rem; max-width: 1400px; margin: 0 auto; width: 100%; }
+.page.active { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+}
+@media (max-width: 640px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.stat-card.highlight { background: var(--primary); border-color: var(--primary); color: white; }
+.stat-card.highlight .stat-label { color: rgba(255,255,255,.75); }
+.stat-card.positive { background: var(--green-bg); border-color: var(--green-border); }
+.stat-card.positive .stat-label { color: var(--green-text); }
+.stat-card.positive .stat-num { color: var(--green-text); }
+.stat-num { font-family: var(--font-serif); font-size: 2rem; font-weight: 700; line-height: 1; margin-top: .25rem; }
+.stat-num.small { font-size: 1.4rem; }
+.stat-label { font-size: .75rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ALERT BANNERS */
+.alert-banner {
+  background: var(--amber-bg); border: 1px solid var(--amber-border);
+  border-radius: var(--radius); padding: .9rem 1.25rem;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; gap: .75rem;
+  transition: background .15s;
+}
+.alert-banner:hover { background: #fef3c7; }
+.alert-banner-left { display: flex; align-items: center; gap: .6rem; font-weight: 600; color: var(--amber-text); font-size: .9rem; }
+.alert-banner svg { color: var(--amber-text); flex-shrink: 0; }
+
+/* STOCK ALERT */
+.stock-alert-banner {
+  background: var(--red-bg); border: 1px solid var(--red-border);
+  border-radius: var(--radius); padding: .9rem 1.25rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem;
+}
+.stock-alert-banner-left { display: flex; align-items: center; gap: .6rem; font-weight: 600; color: var(--red-text); font-size: .9rem; }
+.stock-alert-banner svg { color: var(--red-text); flex-shrink: 0; }
+.stock-alert-items { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+.stock-alert-item { background: white; border: 1px solid var(--red-border); border-radius: 6px; padding: 2px 10px; font-size: .78rem; color: var(--red-text); font-weight: 600; }
+
+/* TOOLBAR */
+.toolbar {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .9rem 1rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.search-wrap { position: relative; flex: 1; min-width: 200px; }
+.search-wrap svg { position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.search-wrap input { padding-left: 2.2rem; }
+
+input[type=text], input[type=date], input[type=email], input[type=number], select, textarea {
+  width: 100%; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 7px;
+  font-family: var(--font-sans); font-size: .875rem; color: var(--text);
+  background: white; outline: none; transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(123,31,58,.1); }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b5057' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .6rem center; padding-right: 2rem; cursor: pointer; }
+textarea { resize: vertical; min-height: 70px; }
+
+.toolbar-selects { display: flex; gap: .5rem; flex-wrap: wrap; }
+.toolbar-selects select { min-width: 160px; }
+.toolbar-actions { display: flex; gap: .5rem; margin-left: auto; flex-wrap: wrap; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .5rem 1rem; border-radius: 7px; font-family: var(--font-sans);
+  font-size: .875rem; font-weight: 500; cursor: pointer; border: none;
+  transition: all .15s; white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--bg-secondary); }
+.btn-ghost { background: none; color: var(--text-muted); padding: .35rem .5rem; }
+.btn-ghost:hover { background: var(--bg-secondary); color: var(--text); }
+.btn-danger { background: white; color: #b91c1c; border: 1px solid var(--border); }
+.btn-danger:hover { background: #fef2f2; }
+.btn-success { background: #166534; color: white; }
+.btn-success:hover { background: #14532d; }
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* TABLE */
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th { background: var(--bg-secondary); color: var(--text-muted); font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; cursor: pointer; border-left: 4px solid transparent; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--bg-secondary); }
+tbody tr.overdue { border-left-color: #b91c1c; background: rgba(185,28,28,.12); }
+tbody tr.overdue .td-empresa { color: #991b1b; font-weight: 700; }
+tbody tr.low-stock { border-left-color: #dc2626; }
+tbody td { padding: .7rem 1rem; vertical-align: middle; }
+.td-empresa { font-weight: 600; }
+.td-muted { color: var(--text-muted); }
+.td-note { color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-actions { text-align: right; white-space: nowrap; }
+.td-hover-info { font-size: .72rem; color: var(--text-muted); margin-top: 2px; display: none; }
+tbody tr:hover .td-hover-info { display: block; }
+.empty-state { text-align: center; padding: 3rem; color: var(--text-muted); font-size: .9rem; }
+
+/* BADGES */
+.badge {
+  display: inline-block; font-size: .7rem; font-weight: 600;
+  padding: 2px 9px; border-radius: 20px;
+}
+.badge-Nuevo      { background: #E6F1FB; color: #0C447C; }
+.badge-Contactado { background: #FAEEDA; color: #633806; }
+.badge-Interesado { background: #EAF3DE; color: #27500A; }
+.badge-Cerrado    { background: #E1F5EE; color: #085041; }
+.badge-no        { background: #FCEBEB; color: #791F1F; }
+.badge-outline   { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border); }
+.badge-secondary { background: var(--primary-light); color: var(--primary); }
+.badge-profit    { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.badge-loss      { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.badge-stock-low { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+.badge-stock-ok  { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+/* OVERLAY / SHEET */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 100; }
+.overlay.open { display: block; pointer-events: auto; }
+
+.sheet {
+  position: fixed; top: 0; right: -540px; width: 500px; height: 100vh;
+  background: white; z-index: 200; overflow-y: auto; display: flex; flex-direction: column;
+  transition: right .25s ease; box-shadow: -4px 0 24px rgba(0,0,0,.15);
+}
+.sheet.open { right: 0; }
+@media (max-width: 520px) { .sheet { width: 100%; right: -100%; } .sheet.open { right: 0; } }
+.sheet-header { padding: 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
+.sheet-title { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: .6rem; }
+.sheet-badges { display: flex; flex-wrap: wrap; gap: .4rem; }
+.sheet-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; gap: 1.5rem; }
+.sheet-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); background: var(--bg-secondary); display: flex; gap: .5rem; }
+
+.section-title { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .6rem; }
+.info-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.info-row { display: flex; align-items: center; justify-content: space-between; font-size: .85rem; margin-bottom: .6rem; }
+.info-row:last-child { margin-bottom: 0; }
+.info-row-label { color: var(--text-muted); }
+.info-row-val { font-weight: 500; display: flex; align-items: center; gap: .3rem; }
+.info-row-val.overdue { color: #d97706; font-weight: 700; }
+.info-link { color: var(--primary); text-decoration: none; }
+.info-link:hover { text-decoration: underline; }
+.info-contact-name { font-weight: 600; font-size: 1rem; margin-bottom: .6rem; }
+.info-inline { display: flex; align-items: center; gap: .5rem; font-size: .85rem; margin-bottom: .4rem; }
+.info-inline svg { width: 15px; height: 15px; color: var(--text-muted); flex-shrink: 0; }
+.info-quote { font-style: italic; color: var(--text-muted); font-size: .83rem; border-top: 1px solid var(--border); padding-top: .6rem; margin-top: .6rem; }
+
+.separator { border: none; border-top: 1px solid var(--border); }
+
+/* Historial */
+.historial-empty { border: 1px dashed var(--border); border-radius: 8px; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: .85rem; }
+.historial-list { display: flex; flex-direction: column; gap: .6rem; }
+.historial-entry { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: .75rem; font-size: .83rem; }
+.historial-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
+.historial-entry-date { font-weight: 600; }
+.historial-entry-nota { color: var(--text-muted); }
+
+/* ── GANANCIAS en historial ── */
+.historial-ventas { margin-top: .5rem; border-top: 1px solid var(--border); padding-top: .5rem; }
+.historial-venta-row { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-muted); margin-bottom: .25rem; }
+.historial-venta-row:last-child { margin-bottom: 0; font-weight: 600; color: var(--text); }
+.profit-positive { color: #166534; font-weight: 600; }
+.profit-negative { color: #991b1b; font-weight: 600; }
+
+/* Nuevo contacto form */
+.new-contact-box { background: rgba(123,31,58,.04); border: 1px solid rgba(123,31,58,.2); border-radius: 8px; padding: 1rem; }
+.new-contact-title { font-weight: 600; color: var(--primary); font-size: .9rem; margin-bottom: .9rem; display: flex; align-items: center; gap: .4rem; }
+.new-contact-title svg { width: 16px; height: 16px; }
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: .6rem; }
+.form-group { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .6rem; }
+.form-group label { font-size: .75rem; font-weight: 500; color: var(--text-muted); }
+.form-group.last { margin-bottom: 0; }
+
+/* MODAL */
+.modal {
+  position: fixed; inset: 0; z-index: 300;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.4);
+}
+.modal.open { display: flex; }
+.modal-box {
+  background: white; border-radius: 12px; width: min(680px, 95vw);
+  max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
+.modal-header h3 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+.modal-body { padding: 1.25rem 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.modal-body .full { grid-column: 1 / -1; }
+.modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); background: var(--bg-secondary); display: flex; justify-content: flex-end; gap: .5rem; }
+
+/* STATS PAGE */
+.stats-page-title { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+@media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+.chart-full { grid-column: 1 / -1; }
+.chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.chart-title { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 1rem; }
+.chart-wrap { position: relative; }
+
+/* HISTORIAL FINANCIERO por cliente */
+.fin-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.fin-table thead th { background: var(--bg-secondary); color: var(--text-muted); font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: .6rem .9rem; text-align: left; border-bottom: 1px solid var(--border); }
+.fin-table tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+.fin-table tbody tr:last-child { border-bottom: none; }
+.fin-table tbody tr:hover { background: var(--bg-secondary); }
+.fin-table tbody td { padding: .6rem .9rem; vertical-align: middle; }
+
+/* EXPORT MODAL */
+.export-tabs { display: flex; gap: .5rem; margin-bottom: 1.25rem; }
+.export-tab { flex: 1; padding: .75rem; border: 2px solid var(--border); border-radius: 8px; background: white; cursor: pointer; text-align: center; font-family: var(--font-sans); font-size: .85rem; font-weight: 500; color: var(--text-muted); transition: all .15s; }
+.export-tab.active { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+.export-tab:hover:not(.active) { border-color: #d0b8bf; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d0b8bf; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" style="display:flex;align-items:center;justify-content:center;height:100vh;background:#faf7f8;">
+  <div style="width:350px;background:white;padding:2rem;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);">
+    <h2 style="margin-bottom:1.5rem;color:#7B1F3A;font-family:'Playfair Display', serif;">CRM Vinos</h2>
+    <input type="email" id="login-email" placeholder="Email" style="margin-bottom:1rem;">
+    <input type="password" id="login-password" placeholder="Password" style="margin-bottom:1rem;">
+    <button class="btn btn-primary" style="width:100%;" onclick="login()">Ingresar</button>
+  </div>
+</div>
+
+<div class="app" id="app" style="display:none;">
+
+<!-- HEADER -->
+<header>
+  <div class="header-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M7 10h10"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5z"/></svg>
+    CRM Vinos
+  </div>
+ <div style="display:flex;align-items:center;gap:1rem;">
+
+  <div
+    id="logged-user"
+    style="
+      color:white;
+      font-size:.85rem;
+      background:rgba(255,255,255,.12);
+      padding:.45rem .8rem;
+      border-radius:8px;
+      font-weight:500;
+    "
+  >
+    👤 —
+  </div>
+
+  <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('clientes')">Clientes</button>
+      <button class="nav-tab" onclick="showPage('vinos')">Vinos</button>
+      <button class="nav-tab" onclick="showPage('financiero')">Financiero</button>
+      <button class="nav-tab" onclick="showPage('estadisticas')">Estadísticas</button>
+    </nav>
+    <button class="btn btn-outline" onclick="logout()">Salir</button>
+  </div>
+</header>
+
+<!-- ══ PÁGINA: CLIENTES ══════════════════════════════════════════════════════ -->
+<div class="page active" id="page-clientes">
+
+  <div class="alert-banner" id="alert-banner" style="display:none" onclick="filterPendientes()">
+    <div class="alert-banner-left">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="alert-text"></span>
+    </div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+  </div>
+
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search" placeholder="Buscar empresa o contacto…">
+    </div>
+    <div class="toolbar-selects">
+      <select id="filterEstado">
+        <option value="">Todos los estados</option>
+        <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
+        <option>Cerrado</option><option>No interesa</option>
+        <option value="__pendiente__">Pendientes Hoy</option>
+      </select>
+      <select id="filterPais">
+        <option value="">Todos los países</option>
+        <option>Luxemburgo</option><option>Bélgica</option><option>Francia</option>
+      </select>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn btn-outline" onclick="openExportModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar
+      </button>
+      <button class="btn btn-primary" onclick="openModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Agregar Cliente
+      </button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Empresa</th><th>Tipo</th><th>País</th><th>Contacto</th>
+          <th>Estado</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PÁGINA: VINOS ═════════════════════════════════════════════════ -->
+<div class="page" id="page-vinos">
+
+  <div class="stats-page-title">Gestión de Vinos</div>
+
+  <!-- ALERTA STOCK BAJO -->
+  <div id="stock-alert-container"></div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openWineModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Agregar Vino
+    </button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;">
+      <label style="font-size:.8rem;color:var(--text-muted);font-weight:500;">Alerta stock bajo:</label>
+      <input type="number" id="stock-threshold" value="6" min="1" style="width:70px;" onchange="renderVinos()">
+      <span style="font-size:.8rem;color:var(--text-muted);">botellas</span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Vino</th>
+          <th>Bodega</th>
+          <th>Varietal</th>
+          <th>P. Compra</th>
+          <th>P. Venta</th>
+          <th>Margen</th>
+          <th>Stock</th>
+          <th>Estado Stock</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-vinos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PÁGINA: FINANCIERO ══════════════════════════════════════════════════ -->
+<div class="page" id="page-financiero">
+
+  <div class="stats-page-title">Historial Financiero por Cliente</div>
+
+  <div class="stats-grid" id="stats-grid-fin"></div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search-fin" placeholder="Buscar cliente…" oninput="renderFinanciero()">
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn btn-outline" onclick="openExportModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar
+      </button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="fin-table">
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>País</th>
+          <th>Compras</th>
+          <th>Botellas</th>
+          <th>Total Gastado</th>
+          <th>Costo Total</th>
+          <th>Ganancia Neta</th>
+          <th>Última Compra</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-financiero"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ PÁGINA: ESTADÍSTICAS ═════════════════════════════════════════════════ -->
+<div class="page" id="page-estadisticas">
+  <div class="stats-page-title">Estadísticas de Ventas</div>
+
+  <div class="stats-grid" id="stats-grid-2"></div>
+
+  <div class="charts-grid">
+    <div class="chart-card chart-full">
+      <div class="chart-title">Clientes por Estado</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chart-estado"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Clientes por País</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-pais"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Clientes por Tipo</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-tipo"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Vinos Más Vendidos (botellas)</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-vinos"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ganancia por Vino (€)</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-ganancias"></canvas></div>
+    </div>
+    <div class="chart-card chart-full">
+      <div class="chart-title">Facturación mensual — últimos 6 meses</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-actividad"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeSheet();closeModal();closeWineModal();closeExportModal();"></div>
+
+<!-- DETAIL SHEET -->
+<div class="sheet" id="sheet">
+  <div class="sheet-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;">
+    <div>
+      <div class="sheet-title" id="sheet-empresa"></div>
+      <div class="sheet-badges" id="sheet-badges"></div>
+    </div>
+    <button onclick="closeSheet()" style="border:none;background:none;font-size:24px;cursor:pointer;color:#7B1F3A;line-height:1;">×</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
+  <div class="sheet-footer">
+    <button class="btn btn-outline" style="flex:1" onclick="editFromSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Editar Cliente
+    </button>
+    <button class="btn btn-danger" onclick="deleteFromSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="modal-title">Nuevo Cliente</h3></div>
+    <div class="modal-body">
+      <div class="form-group full">
+        <label>Empresa / Establecimiento *</label>
+        <input type="text" id="f-empresa" placeholder="Ej: Restaurant Le Vin…">
+      </div>
+      <div class="form-group">
+        <label>Tipo de cliente</label>
+        <select id="f-tipo">
+          <option value="">Seleccione…</option>
+          <option>Restaurante</option><option>Vinoteca</option><option>Supermercado</option>
+          <option>Hotel</option><option>Importador</option><option>Distribuidor</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>País</label>
+        <select id="f-pais">
+          <option value="">Seleccione…</option>
+          <option>Luxemburgo</option><option>Bélgica</option><option>Francia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Persona de contacto</label>
+        <input type="text" id="f-contacto" placeholder="Nombre y apellido">
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="text" id="f-telefono" placeholder="+352…">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="f-email" placeholder="correo@ejemplo.com">
+      </div>
+      <div class="form-group full">
+        <label>Dirección</label>
+        <input type="text" id="f-direccion" placeholder="Ej: 14 Rue de Strasbourg, Luxembourg">
+      </div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="f-estado">
+          <option value="">Seleccione…</option>
+          <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
+          <option>Cerrado</option><option>No interesa</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Último contacto</label>
+        <input type="date" id="f-fecha">
+      </div>
+      <div class="form-group">
+        <label>¿Cómo se contactó?</label>
+        <select id="f-via">
+          <option value="">—</option>
+          <option>Llamada</option><option>Email</option><option>WhatsApp</option>
+          <option>Visita</option><option>LinkedIn</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Próximo seguimiento</label>
+        <input type="date" id="f-proximo">
+      </div>
+      <div class="form-group full">
+        <label>Comentario / Respuesta</label>
+        <textarea id="f-nota" rows="3" placeholder="Ej: Interesado en Malbec, pide muestra…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCliente()">Guardar Cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal" id="export-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Exportar Datos</h3>
+    </div>
+    <div style="padding:1.25rem 1.5rem;">
+      <div class="export-tabs">
+        <button class="export-tab active" id="etab-clientes" onclick="switchExportTab('clientes')">
+          👥 Clientes
+        </button>
+        <button class="export-tab" id="etab-ventas" onclick="switchExportTab('ventas')">
+          🛒 Ventas
+        </button>
+        <button class="export-tab" id="etab-financiero" onclick="switchExportTab('financiero')">
+          💰 Financiero
+        </button>
+      </div>
+      <div id="export-preview" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:.78rem;color:var(--text-muted);max-height:200px;overflow:auto;font-family:monospace;white-space:pre;"></div>
+      <p style="margin-top:.75rem;font-size:.8rem;color:var(--text-muted);">Vista previa de las primeras 3 filas</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeExportModal()">Cancelar</button>
+      <button class="btn btn-success" onclick="doExportCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar CSV
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="edit-history-modal">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <h3>Editar Historial</h3>
+    </div>
+
+    <div class="modal-body">
+
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="eh-fecha">
+      </div>
+
+      <div class="form-group">
+        <label>Vía</label>
+        <select id="eh-via">
+          <option>Llamada</option>
+          <option>Email</option>
+          <option>WhatsApp</option>
+          <option>Visita</option>
+          <option>LinkedIn</option>
+        </select>
+      </div>
+
+      <div class="form-group full">
+        <label>Nota</label>
+        <textarea id="eh-nota" rows="3"></textarea>
+      </div>
+
+      <div class="full">
+        <div id="eh-wines"></div>
+
+        <button
+          type="button"
+          class="btn btn-outline"
+          style="width:100%;margin-top:.5rem"
+          onclick="addEditWineLine()"
+        >
+          + Agregar vino
+        </button>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeEditHistoryModal()">
+        Cancelar
+      </button>
+
+      <button class="btn btn-primary" onclick="saveEditedHistory()">
+        Guardar cambios
+      </button>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- .app -->
+
+<script type="module">
+
+import { supabase } from './supabase.js'
+
+window.login = login;
+window.logout = logout;
+
+checkAuth();
+
+supabase.auth.onAuthStateChange(() => { checkAuth(); });
+
+async function checkAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+const nombre =
+  session.user.user_metadata?.nombre ||
+  session.user.email;
+
+const userBox = document.getElementById('logged-user');
+
+if (userBox) {
+  userBox.textContent = `👤 ${nombre}`;
+}
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    await loadClientes();
+    await loadVinos();
+    await loadVentas();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+}
+
+async function login() {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) { 
+  console.error(error);
+  alert(JSON.stringify(error, null, 2));
+  return; 
+}
+  checkAuth();
+}
+
+async function logout() {
+  await supabase.auth.signOut();
+  checkAuth();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ESTADO_COLORS = {
+  'Nuevo':       { bg: '#E6F1FB', text: '#0C447C' },
+  'Contactado':  { bg: '#FAEEDA', text: '#633806' },
+  'Interesado':  { bg: '#EAF3DE', text: '#27500A' },
+  'Cerrado':     { bg: '#E1F5EE', text: '#085041' },
+  'No interesa': { bg: '#FCEBEB', text: '#791F1F' },
+};
+
+const STOCK_THRESHOLD_DEFAULT = 6;
+
+function today() { return new Date().toISOString().split('T')[0]; }
+
+let clientes = [];
+let vinos    = [];
+let ventas   = [];
+
+async function loadVentas() {
+  const { data, error } = await supabase
+    .from('ventas')
+    .select('*')
+    .order('fecha', { ascending: false });
+  if (error) { console.error('Error cargando ventas:', error); return; }
+  ventas = data || [];
+}
+
+async function loadClientes() {
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .order('updated_at', { ascending: false });
+  if (error) { console.error('Error cargando clientes:', error); return; }
+  clientes = (data || []).map(c => ({
+  ...c,
+  historial: (c.historial || []).map(h => ({
+    id: h.id || crypto.randomUUID(),
+    ...h
+  }))
+}));
+
+  setTimeout(() => { renderTable(); }, 0);
+}
+
+let editingId = null;
+let sheetId   = null;
+
+async function loadVinos() {
+  const { data, error } = await supabase.from('vinos').select('*').order('nombre');
+  if (error) { console.error('Error cargando vinos:', error); return; }
+  vinos = data || [];
+  renderVinos();
+}
+
+let chartEstado   = null,
+    chartPais     = null,
+    chartTipo     = null,
+    chartActividad= null,
+    chartVinos    = null,
+    chartGanancias= null;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function stateBadge(estado) {
+  const c = ESTADO_COLORS[estado];
+  if (!c) return `<span class="badge badge-outline">${esc(estado)}</span>`;
+  return `<span class="badge" style="background:${c.bg};color:${c.text}">${esc(estado)}</span>`;
+}
+
+function pendingClientes() {
+  return clientes.filter(c =>
+    c.proximo &&
+    new Date(c.proximo).toDateString() === new Date().toDateString() &&
+    c.estado !== 'Cerrado' &&
+    c.estado !== 'No interesa'
+  );
+}
+
+function getStockThreshold() {
+  const el = document.getElementById('stock-threshold');
+  return el ? Number(el.value) || STOCK_THRESHOLD_DEFAULT : STOCK_THRESHOLD_DEFAULT;
+}
+
+function getLowStockVinos() {
+  const threshold = getStockThreshold();
+  return vinos.filter(v => Number(v.stock_actual || 0) <= threshold);
+}
+
+// Calcula ganancia de un vino (precio venta - precio compra)
+function calcMargen(vino) {
+  const compra = Number(vino.precio_compra || 0);
+  const venta  = Number(vino.precio_venta  || 0);
+  if (compra === 0 || venta === 0) return null;
+  return { bruto: venta - compra, pct: ((venta - compra) / compra * 100) };
+}
+
+// Ganancia neta de una venta: (precio_venta - precio_compra) * cantidad
+function calcVentaGanancia(ventaRow) {
+  const vino = vinos.find(v => v.id === ventaRow.vino_id);
+  if (!vino) return 0;
+  const compra = Number(vino.precio_compra || 0);
+  const venta  = Number(ventaRow.precio_unitario || 0);
+  return (venta - compra) * Number(ventaRow.cantidad || 0);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const activeBtn = [...document.querySelectorAll('.nav-tab')].find(btn =>
+    btn.textContent.toLowerCase().includes(name === 'financiero' ? 'financiero' : name)
+  );
+  if (activeBtn) activeBtn.classList.add('active');
+  if (name === 'estadisticas') renderStats();
+  if (name === 'financiero')   renderFinanciero();
+  if (name === 'vinos')        renderVinos();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RENDER TABLE (clientes)
+// ══════════════════════════════════════════════════════════════════════════════
+function getSearchValue() {
+  const el = document.getElementById('search');
+  return el ? (el.value || '').toLowerCase().trim() : '';
+}
+
+function renderTable() {
+  const q  = getSearchValue();
+  const fe = document.getElementById('filterEstado').value;
+  const fp = document.getElementById('filterPais').value;
+  const pending = pendingClientes().map(c => c.id);
+
+  const filtered = clientes.filter(c => {
+    const empresa  = (c.empresa  || '').toLowerCase();
+    const contacto = (c.contacto || '').toLowerCase();
+    const matchQ = !q || empresa.includes(q) || contacto.includes(q);
+    const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
+    const matchP = !fp || c.pais === fp;
+    return matchQ && matchE && matchP;
+  });
+
+  const tbody = document.getElementById('tbody');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
+  } else {
+    tbody.innerHTML = filtered.map(c => {
+      const overdue = c.proximo && c.proximo <= today() && c.estado !== 'Cerrado' && c.estado !== 'No interesa';
+      return `
+        <tr class="${overdue ? 'overdue' : ''}" onclick="openSheet('${c.id}')">
+          <td class="td-empresa">${esc(c.empresa)}</td>
+          <td class="td-muted">${esc(c.tipo)}</td>
+          <td class="td-muted">${esc(c.pais)}</td>
+          <td>
+            <div>${esc(c.contacto || '—')}</div>
+            <div class="td-hover-info">${esc(c.email || '')}${c.email && c.telefono ? ' · ' : ''}${esc(c.telefono || '')}</div>
+          </td>
+          <td>${stateBadge(c.estado)}</td>
+          <td class="td-muted">${esc(c.fecha || '—')}</td>
+          <td class="td-note" title="${esc(c.nota)}">${esc((c.nota || '').substring(0, 80))}${(c.nota || '').length > 80 ? '…' : ''}</td>
+          <td class="td-actions">
+            <button class="btn btn-ghost" onclick="event.stopPropagation();openModal('${c.id}')" title="Editar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn btn-ghost" onclick="event.stopPropagation();deleteCliente('${c.id}')" title="Eliminar" style="color:#b91c1c">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  renderStatCards();
+  renderAlertBanner();
+}
+
+function renderStatCards() {
+  const pending = pendingClientes().length;
+
+  // Calcula facturación total y ganancia total
+  const facturacionTotal = ventas.reduce((a, v) => a + Number(v.total || 0), 0);
+  const gananciaTotal    = ventas.reduce((a, v) => a + calcVentaGanancia(v), 0);
+
+  const data = [
+    { label: 'Total Clientes',    num: clientes.length, hl: false },
+    { label: 'Interesados',       num: clientes.filter(c => c.estado === 'Interesado').length, hl: false },
+    { label: 'Cerrados',          num: clientes.filter(c => c.estado === 'Cerrado').length, hl: false },
+    { label: 'Seguimiento Hoy',   num: pending, hl: pending > 0 },
+  ];
+
+  document.getElementById('stats-grid').innerHTML = data.map(d =>
+    `<div class="stat-card ${d.hl ? 'highlight' : ''}">
+      <div class="stat-label">${d.label}</div>
+      <div class="stat-num">${d.num}</div>
+    </div>`
+  ).join('');
+}
+
+function renderAlertBanner() {
+  const n  = pendingClientes().length;
+  const el = document.getElementById('alert-banner');
+  if (n > 0) {
+    document.getElementById('alert-text').textContent = `${n} cliente(s) con seguimiento pendiente hoy`;
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function filterPendientes() {
+  document.getElementById('filterEstado').value = '__pendiente__';
+  renderTable();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RENDER VINOS — con margen, stock bajo
+// ══════════════════════════════════════════════════════════════════════════════
+function renderVinos() {
+  const tbody    = document.getElementById('tbody-vinos');
+  const container = document.getElementById('stock-alert-container');
+  if (!tbody) return;
+
+  const threshold  = getStockThreshold();
+  const lowStockVinos = vinos.filter(v => Number(v.stock_actual || 0) <= threshold);
+
+  // Alerta de stock bajo en la parte superior
+  if (container) {
+    if (lowStockVinos.length > 0) {
+      container.innerHTML = `
+        <div class="stock-alert-banner">
+          <div>
+            <div class="stock-alert-banner-left">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              ⚠️ Stock bajo en ${lowStockVinos.length} vino(s) — umbral: ${threshold} botellas
+            </div>
+            <div class="stock-alert-items">
+              ${lowStockVinos.map(v => `<span class="stock-alert-item">${esc(v.nombre)}: ${v.stock_actual} uds.</span>`).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      container.innerHTML = '';
+    }
+  }
+
+  if (vinos.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">No hay vinos cargados.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = vinos.map(v => {
+    const margen   = calcMargen(v);
+    const stock    = Number(v.stock_actual || 0);
+    const isLow    = stock <= threshold;
+
+    const margenHTML = margen
+      ? `<span class="badge ${margen.bruto >= 0 ? 'badge-profit' : 'badge-loss'}">
+           ${margen.bruto >= 0 ? '+' : ''}€${margen.bruto.toFixed(2)} (${margen.pct.toFixed(0)}%)
+         </span>`
+      : `<span class="badge badge-outline">—</span>`;
+
+    const stockBadge = isLow
+      ? `<span class="badge badge-stock-low">⚠️ Bajo (${stock})</span>`
+      : `<span class="badge badge-stock-ok">✓ OK (${stock})</span>`;
+
+    return `
+      <tr class="${isLow ? 'low-stock' : ''}">
+        <td style="font-weight:600">${esc(v.nombre)}</td>
+        <td>${esc(v.bodega || '—')}</td>
+        <td>${esc(v.varietal || '—')}</td>
+        <td class="td-muted">€ ${Number(v.precio_compra || 0).toFixed(2)}</td>
+        <td>€ ${Number(v.precio_venta || 0).toFixed(2)}</td>
+        <td>${margenHTML}</td>
+        <td>${stock}</td>
+        <td>${stockBadge}</td>
+        <td style="display:flex;gap:.4rem;">
+          <button class="btn btn-ghost" onclick="openWineModal('${v.id}')">Editar</button>
+          <button class="btn btn-ghost" style="color:#b91c1c" onclick="deleteWine('${v.id}')">Eliminar</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PÁGINA FINANCIERO — historial por cliente + ganancias reales
+// ══════════════════════════════════════════════════════════════════════════════
+function renderFinanciero() {
+  const q = (document.getElementById('search-fin')?.value || '').toLowerCase().trim();
+
+  // Agrupa ventas por cliente
+  const porCliente = {};
+  ventas.forEach(v => {
+    if (!porCliente[v.cliente_id]) {
+      porCliente[v.cliente_id] = {
+        id:         v.cliente_id,
+        nombre:     v.cliente_nombre || '—',
+        compras:    0,
+        botellas:   0,
+        total:      0,
+        costo:      0,
+        ganancia:   0,
+        ultima:     null,
+        pais:       ''
+      };
+    }
+    const row   = porCliente[v.cliente_id];
+    const vino  = vinos.find(vi => vi.id === v.vino_id);
+    const compra = vino ? Number(vino.precio_compra || 0) : 0;
+    const cant   = Number(v.cantidad || 0);
+    const tot    = Number(v.total || 0);
+    const costoV = compra * cant;
+
+    row.compras++;
+    row.botellas += cant;
+    row.total    += tot;
+    row.costo    += costoV;
+    row.ganancia += (tot - costoV);
+
+    if (!row.ultima || v.fecha > row.ultima) row.ultima = v.fecha;
+  });
+
+  // Agrega info de país desde clientes
+  Object.values(porCliente).forEach(row => {
+    const cl = clientes.find(c => c.id === row.id);
+    if (cl) row.pais = cl.pais || '';
+  });
+
+  // Estadísticas globales
+  const filas = Object.values(porCliente);
+  const totalFacturado  = filas.reduce((a, r) => a + r.total, 0);
+  const totalGanancia   = filas.reduce((a, r) => a + r.ganancia, 0);
+  const totalBotellas   = filas.reduce((a, r) => a + r.botellas, 0);
+  const mejorCliente    = filas.sort((a, b) => b.total - a.total)[0];
+
+  document.getElementById('stats-grid-fin').innerHTML = [
+    { label: 'Facturación Total',  num: `€ ${totalFacturado.toFixed(2)}`, hl: false },
+    { label: 'Ganancia Neta Total',num: `€ ${totalGanancia.toFixed(2)}`,  hl: true  },
+    { label: 'Botellas Vendidas',  num: totalBotellas,                    hl: false },
+    { label: 'Clientes Activos',   num: filas.length,                     hl: false },
+  ].map(d => `
+    <div class="stat-card ${d.hl ? 'positive' : ''}">
+      <div class="stat-label">${d.label}</div>
+      <div class="stat-num ${String(d.num).length > 8 ? 'small' : ''}">${d.num}</div>
+    </div>
+  `).join('');
+
+  // Filtra y ordena
+  const filtradas = filas
+    .filter(r => !q || r.nombre.toLowerCase().includes(q))
+    .sort((a, b) => b.total - a.total);
+
+  const tbody = document.getElementById('tbody-financiero');
+  if (filtradas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No hay historial de ventas registrado.</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtradas.map(r => {
+    const gananciaClass = r.ganancia >= 0 ? 'profit-positive' : 'profit-negative';
+    return `
+      <tr>
+        <td style="font-weight:600">${esc(r.nombre)}</td>
+        <td class="td-muted">${esc(r.pais)}</td>
+        <td style="text-align:center">${r.compras}</td>
+        <td style="text-align:center">${r.botellas}</td>
+        <td>€ ${r.total.toFixed(2)}</td>
+        <td class="td-muted">€ ${r.costo.toFixed(2)}</td>
+        <td class="${gananciaClass}">€ ${r.ganancia.toFixed(2)}</td>
+        <td class="td-muted">${esc(r.ultima || '—')}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODAL ADD/EDIT CLIENTE
+// ══════════════════════════════════════════════════════════════════════════════
+function openModal(id) {
+  editingId = id || null;
+  const c = id ? clientes.find(x => x.id === id) : {};
+  document.getElementById('modal-title').textContent = id ? 'Editar Cliente' : 'Nuevo Cliente';
+  document.getElementById('f-empresa').value   = c.empresa   || '';
+  document.getElementById('f-tipo').value      = c.tipo      || '';
+  document.getElementById('f-pais').value      = c.pais      || '';
+  document.getElementById('f-contacto').value  = c.contacto  || '';
+  document.getElementById('f-telefono').value  = c.telefono  || '';
+  document.getElementById('f-email').value     = c.email     || '';
+  document.getElementById('f-direccion').value = c.direccion || '';
+  document.getElementById('f-estado').value    = c.estado    || '';
+  document.getElementById('f-fecha').value     = c.fecha     || '';
+  document.getElementById('f-via').value       = c.via       || '';
+  document.getElementById('f-proximo').value   = c.proximo   || '';
+  document.getElementById('f-nota').value      = c.nota      || '';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  editingId = null;
+}
+
+let savingCliente = false;
+
+async function saveCliente() {
+  if (savingCliente) return;
+  savingCliente = true;
+  const btn = document.querySelector('#modal .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  const empresa = document.getElementById('f-empresa').value.trim();
+  if (!empresa) {
+    alert('El nombre de la empresa es obligatorio.');
+    savingCliente = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
+    return;
+  }
+
+  const c = {
+    empresa,
+    tipo:      document.getElementById('f-tipo').value,
+    pais:      document.getElementById('f-pais').value,
+    contacto:  document.getElementById('f-contacto').value.trim(),
+    telefono:  document.getElementById('f-telefono').value.trim(),
+    email:     document.getElementById('f-email').value.trim(),
+    direccion: document.getElementById('f-direccion').value.trim(),
+    estado:    document.getElementById('f-estado').value,
+    fecha:     document.getElementById('f-fecha').value,
+    via:       document.getElementById('f-via').value,
+    proximo:   document.getElementById('f-proximo').value,
+    nota:      document.getElementById('f-nota').value.trim(),
+  };
+
+  let error;
+  if (editingId) {
+    ({ error } = await supabase.from('clientes').update(c).eq('id', editingId));
+  } else {
+    ({ error } = await supabase.from('clientes').insert([{ ...c, historial: [] }]));
+  }
+
+  if (error) {
+    console.error(error); alert('Error guardando cliente');
+    savingCliente = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
+    return;
+  }
+
+  closeModal();
+  await loadClientes();
+  savingCliente = false;
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DELETE
+// ══════════════════════════════════════════════════════════════════════════════
+async function deleteCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c || !confirm(`¿Eliminar "${c.empresa}"?`)) return;
+  const { error } = await supabase.from('clientes').delete().eq('id', id);
+  if (error) { console.error(error); alert('Error eliminando cliente'); return; }
+  if (sheetId === id) closeSheet();
+  await loadClientes();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DETAIL SHEET
+// ══════════════════════════════════════════════════════════════════════════════
+function openSheet(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  sheetId = id;
+  const t = today();
+  const isOverdue = c.proximo && c.proximo <= t && c.estado !== 'Cerrado' && c.estado !== 'No interesa';
+
+  document.getElementById('sheet-empresa').textContent = c.empresa;
+  document.getElementById('sheet-badges').innerHTML =
+    `<span class="badge badge-outline">${esc(c.tipo)}</span>
+     <span class="badge badge-secondary">${esc(c.pais)}</span>
+     ${stateBadge(c.estado)}`;
+
+  // Historial con ventas y ganancias
+  const histHTML = (c.historial && c.historial.length > 0)
+    ? `<div class="historial-list">
+        ${c.historial.map(h => {
+          const tieneVentas = h.ventas && h.ventas.length > 0;
+          const gananciaEntrada = tieneVentas
+            ? h.ventas.reduce((acc, vv) => {
+                const vino = vinos.find(vi => vi.id === vv.vinoId);
+                const compra = vino ? Number(vino.precio_compra || 0) : 0;
+                return acc + ((Number(vv.precio || 0) - compra) * Number(vv.cantidad || 0));
+              }, 0)
+            : 0;
+
+          const ventasHTML = tieneVentas ? `
+            <div class="historial-ventas">
+              ${h.ventas.map(vv => `
+                <div class="historial-venta-row">
+                  <span>${esc(vv.vinoNombre)} × ${vv.cantidad}</span>
+                  <span>€ ${Number(vv.total || 0).toFixed(2)}</span>
+                </div>
+              `).join('')}
+              <div class="historial-venta-row">
+                <span>Total venta</span>
+                <span>€ ${Number(h.total_general || 0).toFixed(2)}</span>
+              </div>
+              ${gananciaEntrada !== 0 ? `
+              <div class="historial-venta-row">
+                <span>Ganancia neta</span>
+                <span class="${gananciaEntrada >= 0 ? 'profit-positive' : 'profit-negative'}">
+                  ${gananciaEntrada >= 0 ? '+' : ''}€ ${gananciaEntrada.toFixed(2)}
+                </span>
+              </div>` : ''}
+            </div>` : '';
+
+          return `
+            <div class="historial-entry">
+              <div class="historial-entry-header">
+                <span class="historial-entry-date">${esc(h.fecha)}</span>
+                <div style="display:flex;gap:.4rem;align-items:center;">
+                  <span class="badge badge-outline">${esc(h.via)}</span>
+                  <button class="btn btn-ghost" style="padding:.2rem .35rem" onclick="event.stopPropagation();editHistorial('${c.id}','${h.id}')">✏️</button>
+                  <button class="btn btn-ghost" style="padding:.2rem .35rem;color:#b91c1c" onclick="event.stopPropagation();deleteHistorial('${c.id}','${h.id}')">🗑️</button>
+                </div>
+              </div>
+            <div class="historial-entry-nota">
+  ${esc(h.nota)}
+</div>
+
+<div style="
+  margin-top:.35rem;
+  font-size:.72rem;
+  color:var(--text-muted);
+">
+  👤 ${esc(h.vendedor || 'Sin vendedor')}
+</div>
+              ${ventasHTML}
+            </div>
+          `;
+        }).join('')}
+      </div>`
+    : `<div class="historial-empty">No hay historial registrado.</div>`;
+
+  // Total gastado por este cliente
+  const ventasCliente  = ventas.filter(v => v.cliente_id === id);
+  const totalCliente   = ventasCliente.reduce((a, v) => a + Number(v.total || 0), 0);
+  const gananciaCliente= ventasCliente.reduce((a, v) => a + calcVentaGanancia(v), 0);
+
+  document.getElementById('sheet-body').innerHTML = `
+    <div>
+      <div class="section-title">Información de Contacto</div>
+      <div class="info-card">
+        <div class="info-contact-name">${esc(c.contacto || 'Sin nombre')}</div>
+        ${c.telefono ? `<div class="info-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.9-.9a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17z"/></svg><a class="info-link" href="tel:${esc(c.telefono)}">${esc(c.telefono)}</a></div>` : ''}
+        ${c.email ? `<div class="info-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a class="info-link" href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
+        ${c.telefono ? `<a class="btn btn-primary" href="https://wa.me/${c.telefono.replace(/\D/g,'')}" target="_blank" style="margin-top:.8rem;width:100%;justify-content:center;text-decoration:none;">WhatsApp</a>` : ''}
+        ${c.direccion ? `<div class="info-inline" style="margin-top:.6rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><a class="info-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.direccion)}" target="_blank">${esc(c.direccion)}</a></div>` : ''}
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Resumen Financiero del Cliente</div>
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-row-label">Total comprado</span>
+          <span class="info-row-val" style="font-size:1.1rem;font-weight:700">€ ${totalCliente.toFixed(2)}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Ganancia generada</span>
+          <span class="info-row-val ${gananciaCliente >= 0 ? 'profit-positive' : 'profit-negative'}" style="font-size:1rem">
+            ${gananciaCliente >= 0 ? '+' : ''}€ ${gananciaCliente.toFixed(2)}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Transacciones</span>
+          <span class="info-row-val">${ventasCliente.length}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Botellas compradas</span>
+          <span class="info-row-val">${ventasCliente.reduce((a, v) => a + Number(v.cantidad || 0), 0)}</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Estado de Seguimiento</div>
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-row-label">Último contacto</span>
+          <span class="info-row-val">${esc(c.fecha || '—')} ${c.via ? `(${esc(c.via)})` : ''}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">Próximo seguimiento</span>
+          <span class="info-row-val ${isOverdue ? 'overdue' : ''}">
+            ${isOverdue ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' : ''}
+            ${esc(c.proximo || 'No definido')}
+          </span>
+        </div>
+        ${c.nota ? `<div class="info-quote">"${esc(c.nota)}"</div>` : ''}
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Historial de Contactos (${c.historial?.length || 0})</div>
+      ${histHTML}
+    </div>
+
+    <hr class="separator">
+
+    <div class="new-contact-box">
+      <div class="new-contact-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Registrar Nuevo Contacto
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="nc-fecha" value="${today()}">
+        </div>
+        <div class="form-group">
+          <label>Vía</label>
+          <select id="nc-via">
+            <option value="">Seleccione…</option>
+            <option>Llamada</option><option>Email</option><option>WhatsApp</option>
+            <option>Visita</option><option>LinkedIn</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nota / Resultado</label>
+        <textarea
+  id="nc-nota"
+  rows="2"
+  autocomplete="off"
+  spellcheck="false"
+  placeholder="¿De qué hablaron?"
+></textarea>
+      </div>
+
+      <div id="wine-lines"></div>
+
+      <button type="button" class="btn btn-outline" style="width:100%;margin-top:.5rem" onclick="addWineLine()">
+        + Agregar vino
+      </button>
+
+      <div class="form-group" style="margin-top:.75rem">
+        <label>Total General</label>
+        <input type="text" id="grand-total" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>Actualizar próximo seguimiento (opcional)</label>
+        <input type="date" id="nc-proximo">
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:.75rem" onclick="saveNewContact()">Guardar Contacto</button>
+    </div>
+  `;
+
+  document.getElementById('sheet').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  sheetId = null;
+}
+
+function editFromSheet()   { if (sheetId) openModal(sheetId); }
+function deleteFromSheet() { if (sheetId) deleteCliente(sheetId); }
+
+let savingContact = false;
+
+async function saveNewContact() {
+  if (savingContact) return;
+  savingContact = true;
+  const btn = document.querySelector('.new-contact-box .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    if (!sheetId) return;
+
+    const fecha   = document.getElementById('nc-fecha').value;
+    const via     = document.getElementById('nc-via').value;
+    const nota    = document.getElementById('nc-nota').value.trim();
+    const proximo = document.getElementById('nc-proximo').value;
+
+    if (!via) { alert('Selecciona la vía de contacto.'); return; }
+
+    const wineLines = [...document.querySelectorAll('.wine-line')];
+    const ventasLineas = [];
+    let totalGeneral = 0;
+
+    for (const line of wineLines) {
+      const vinoId   = line.querySelector('.wine-vino').value;
+      const cantidad = Number(line.querySelector('.wine-cantidad').value || 0);
+      if (!vinoId || cantidad <= 0) continue;
+      const vino = vinos.find(v => v.id === vinoId);
+      if (!vino) continue;
+      if (cantidad > Number(vino.stock_actual || 0)) {
+        alert(`No hay stock suficiente para ${vino.nombre}`); return;
+      }
+      const precio = Number(vino.precio_venta || 0);
+      const total  = precio * cantidad;
+      totalGeneral += total;
+      ventasLineas.push({ vinoId, vinoNombre: vino.nombre, cantidad, precio, total });
+    }
+
+    const userData = await supabase.auth.getUser();
+
+const vendedorNombre =
+  userData.data.user?.user_metadata?.nombre ||
+  userData.data.user?.email ||
+  'Desconocido';
+
+const entry = {
+  id: crypto.randomUUID(),
+  fecha,
+  via,
+  nota,
+  ventas: ventasLineas,
+  total_general: totalGeneral,
+  vendedor: vendedorNombre,
+  timestamp: new Date().toISOString()
+};
+
+    const clienteActual = clientes.find(c => c.id === sheetId);
+    const hist = [entry, ...(clienteActual.historial || [])].sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    const { error } = await supabase.from('clientes').update({
+      fecha, via, nota,
+      proximo: proximo || clienteActual.proximo,
+      historial: hist
+    }).eq('id', sheetId);
+
+    if (error) { console.error(error); alert('Error guardando contacto'); return; }
+
+    for (const venta of ventasLineas) {
+      const vino       = vinos.find(v => v.id === venta.vinoId);
+      if (!vino) continue;
+      const nuevoStock = Number(vino.stock_actual || 0) - venta.cantidad;
+
+      const { error: stockError } = await supabase.from('vinos')
+        .update({ stock_actual: nuevoStock }).eq('id', venta.vinoId);
+      if (stockError) { console.error(stockError); alert('Error actualizando stock'); return; }
+
+      const { error: ventaError } = await supabase.from('ventas').insert([{
+        cliente_id:      clienteActual.id,
+        vino_id:         venta.vinoId,
+        cliente_nombre:  clienteActual.empresa,
+        vino_nombre:     venta.vinoNombre,
+        cantidad:        venta.cantidad,
+        precio_unitario: venta.precio,
+        total:           venta.total,
+        fecha,
+        vendedor: vendedorNombre,
+        nota
+      }]);
+     if (ventaError) { 
+  console.error('ERROR VENTA:', ventaError);
+  alert(JSON.stringify(ventaError, null, 2));
+  return; 
+}
+    }
+
+    await loadClientes();
+    await loadVinos();
+    await loadVentas();
+    openSheet(sheetId);
+
+  } finally {
+    savingContact = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar Contacto'; }
+  }
+}
+
+function editHistorial(clienteId, historialId) {
+
+  const cliente = clientes.find(
+    c => c.id === clienteId
+  );
+
+  if (!cliente) return;
+
+  const item = cliente.historial.find(
+    h => String(h.id) === String(historialId)
+  );
+
+  if (!item) return;
+
+  editingHistoryClienteId = clienteId;
+  editingHistoryId = historialId;
+
+  document.getElementById('eh-fecha').value = item.fecha || '';
+  document.getElementById('eh-via').value = item.via || '';
+  document.getElementById('eh-nota').value = item.nota || '';
+
+  const winesContainer = document.getElementById('eh-wines');
+
+  winesContainer.innerHTML = '';
+
+  if (item.ventas && item.ventas.length > 0) {
+
+    item.ventas.forEach(v => {
+
+      winesContainer.insertAdjacentHTML('beforeend', `
+        <div class="edit-wine-line" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-top:.75rem;">
+
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:.6rem;">
+
+            <div class="form-group">
+              <label>Vino</label>
+
+              <select class="edit-vino">
+                ${vinos.map(vino => `
+                  <option value="${vino.id}" ${vino.id === v.vinoId ? 'selected' : ''}>
+                    ${vino.nombre}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Cantidad</label>
+
+              <input
+                type="number"
+                class="edit-cantidad"
+                value="${v.cantidad}"
+                min="1"
+              >
+            </div>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-ghost"
+            style="color:#b91c1c"
+            onclick="this.closest('.edit-wine-line').remove()"
+          >
+            Eliminar vino
+          </button>
+
+        </div>
+      `);
+
+    });
+
+  }
+
+  document.getElementById('edit-history-modal')
+    .classList.add('open');
+
+  document.getElementById('overlay')
+    .classList.add('open');
+}
+
+async function deleteHistorial(clienteId, historialId) {
+
+  if (!confirm('¿Eliminar este contacto del historial?')) return;
+
+  const cliente = clientes.find(c => c.id === clienteId);
+
+  if (!cliente) return;
+
+  const historialItem = cliente.historial.find(
+    h => String(h.id) === String(historialId)
+  );
+
+  if (!historialItem) return;
+
+  // ─────────────────────────────────────
+  // DEVOLVER STOCK
+  // ─────────────────────────────────────
+
+  if (historialItem.ventas && historialItem.ventas.length > 0) {
+
+    for (const venta of historialItem.ventas) {
+
+      const vino = vinos.find(v => v.id === venta.vinoId);
+
+      if (vino) {
+
+        const nuevoStock =
+          Number(vino.stock_actual || 0) +
+          Number(venta.cantidad || 0);
+
+        const { error: stockError } = await supabase
+          .from('vinos')
+          .update({
+            stock_actual: nuevoStock
+          })
+          .eq('id', venta.vinoId);
+
+        if (stockError) {
+          console.error(stockError);
+          alert('Error devolviendo stock');
+          return;
+        }
+      }
+
+      // ─────────────────────────────────────
+      // BORRAR VENTAS
+      // ─────────────────────────────────────
+
+      const { error: ventaError } = await supabase
+        .from('ventas')
+        .delete()
+        .eq('cliente_id', clienteId)
+        .eq('vino_id', venta.vinoId)
+        .eq('fecha', historialItem.fecha);
+
+      if (ventaError) {
+        console.error(ventaError);
+        alert('Error eliminando ventas');
+        return;
+      }
+    }
+  }
+
+  // ─────────────────────────────────────
+  // BORRAR HISTORIAL
+  // ─────────────────────────────────────
+
+  const nuevoHistorial = cliente.historial.filter(
+    h => String(h.id) !== String(historialId)
+  );
+
+  const { error } = await supabase
+    .from('clientes')
+    .update({
+      historial: nuevoHistorial
+    })
+    .eq('id', clienteId);
+
+  if (error) {
+    console.error(error);
+    alert('Error eliminando historial');
+    return;
+  }
+
+  await loadClientes();
+  await loadVinos();
+  await loadVentas();
+
+  openSheet(clienteId);
+}
+
+function addWineLine() {
+  const container = document.getElementById('wine-lines');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', `
+    <div class="wine-line" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-top:.75rem;">
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:.6rem;">
+        <div class="form-group">
+          <label>Vino</label>
+          <select class="wine-vino" onchange="updateWineInfo(this)">
+            <option value="">Seleccione…</option>
+            ${vinos.map(v => `<option value="${v.id}">${esc(v.nombre)} (stock: ${v.stock_actual})</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" class="wine-cantidad" value="1" min="1" oninput="updateWineInfo(this)">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;">
+        <div class="form-group">
+          <label>P. Compra</label>
+          <input type="text" class="wine-compra" readonly style="background:var(--bg-secondary)">
+        </div>
+        <div class="form-group">
+          <label>P. Venta unit.</label>
+          <input type="text" class="wine-precio" readonly>
+        </div>
+        <div class="form-group">
+          <label>Total</label>
+          <input type="text" class="wine-total" readonly>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Ganancia estimada</label>
+        <input type="text" class="wine-ganancia" readonly style="font-weight:600">
+      </div>
+      <button type="button" class="btn btn-ghost" style="color:#b91c1c;margin-top:.5rem" onclick="removeWineLine(this)">Eliminar vino</button>
+    </div>
+  `);
+}
+
+function removeWineLine(btn) {
+  btn.closest('.wine-line').remove();
+  updateGrandTotal();
+}
+
+function updateGrandTotal() {
+  let total    = 0;
+  let ganancia = 0;
+  document.querySelectorAll('.wine-line').forEach(line => {
+    const tot = Number((line.querySelector('.wine-total').value || '').replace('€','').trim()) || 0;
+    const gan = Number((line.querySelector('.wine-ganancia').value || '').replace('€','').replace('+','').trim()) || 0;
+    total    += tot;
+    ganancia += gan;
+  });
+  const grand = document.getElementById('grand-total');
+  if (grand) grand.value = `€ ${total.toFixed(2)}`;
+}
+
+function updateWineInfo(element) {
+  const line     = element.closest('.wine-line');
+  if (!line) return;
+  const vinoId   = line.querySelector('.wine-vino').value;
+  const cantidad = Number(line.querySelector('.wine-cantidad').value || 0);
+  const precioEl = line.querySelector('.wine-precio');
+  const compraEl = line.querySelector('.wine-compra');
+  const totalEl  = line.querySelector('.wine-total');
+  const ganEl    = line.querySelector('.wine-ganancia');
+
+  if (!vinoId) {
+    precioEl.value = ''; compraEl.value = ''; totalEl.value = ''; ganEl.value = '';
+    updateGrandTotal(); return;
+  }
+  const vino    = vinos.find(v => v.id === vinoId);
+  if (!vino) return;
+  const precio  = Number(vino.precio_venta  || 0);
+  const compra  = Number(vino.precio_compra || 0);
+  const total   = precio * cantidad;
+  const ganancia= (precio - compra) * cantidad;
+
+  precioEl.value = `€ ${precio.toFixed(2)}`;
+  compraEl.value = `€ ${compra.toFixed(2)}`;
+  totalEl.value  = `€ ${total.toFixed(2)}`;
+  ganEl.value    = `${ganancia >= 0 ? '+' : ''}€ ${ganancia.toFixed(2)}`;
+  ganEl.style.color = ganancia >= 0 ? '#166534' : '#991b1b';
+  updateGrandTotal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WINE MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+let editingWineId = null;
+let editingHistoryClienteId = null;
+let editingHistoryId = null;
+
+function openWineModal(id = null) {
+  editingWineId = id;
+  const vino = id ? vinos.find(v => v.id === id) : {};
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal open" id="wine-modal">
+      <div class="modal-box">
+        <div class="modal-header"><h3>${id ? 'Editar Vino' : 'Nuevo Vino'}</h3></div>
+        <div class="modal-body">
+          <div class="form-group full">
+            <label>Nombre del vino</label>
+            <input type="text" id="wv-nombre" value="${esc(vino?.nombre || '')}">
+          </div>
+          <div class="form-group">
+            <label>Bodega</label>
+            <input type="text" id="wv-bodega" value="${esc(vino?.bodega || '')}">
+          </div>
+          <div class="form-group">
+            <label>Varietal</label>
+            <input type="text" id="wv-varietal" value="${esc(vino?.varietal || '')}">
+          </div>
+          <div class="form-group">
+            <label>Precio compra (€)</label>
+            <input type="number" id="wv-compra" value="${vino?.precio_compra || 0}" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Precio venta (€)</label>
+            <input type="number" id="wv-venta" value="${vino?.precio_venta || 0}" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Stock inicial</label>
+            <input type="number" id="wv-stock-inicial" value="${vino?.stock_inicial || 0}">
+          </div>
+          <div class="form-group">
+            <label>Stock actual</label>
+            <input type="number" id="wv-stock-actual" value="${vino?.stock_actual || 0}">
+          </div>
+          <div class="form-group full" id="wv-margen-preview" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:.75rem;">
+            <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem;">Vista previa de margen</div>
+            <div id="wv-margen-val" style="font-size:1.1rem;font-weight:700;">—</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeWineModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveWine()">Guardar</button>
+        </div>
+      </div>
+    </div>
+  `);
+  document.getElementById('overlay').classList.add('open');
+
+  // Calculo en tiempo real del margen
+  ['wv-compra','wv-venta'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      const compra = Number(document.getElementById('wv-compra').value || 0);
+      const venta  = Number(document.getElementById('wv-venta').value  || 0);
+      const el     = document.getElementById('wv-margen-val');
+      if (compra > 0 && venta > 0) {
+        const bruto = venta - compra;
+        const pct   = (bruto / compra * 100).toFixed(0);
+        el.textContent  = `${bruto >= 0 ? '+' : ''}€ ${bruto.toFixed(2)} por botella (${pct}%)`;
+        el.style.color  = bruto >= 0 ? '#166534' : '#991b1b';
+      } else {
+        el.textContent = '—';
+        el.style.color = '';
+      }
+    });
+  });
+}
+
+function closeWineModal() {
+  const modal = document.getElementById('wine-modal');
+  if (modal) modal.remove();
+  const overlay = document.getElementById('overlay');
+  if (overlay && !document.getElementById('modal').classList.contains('open') && !document.getElementById('sheet').classList.contains('open')) {
+    overlay.classList.remove('open');
+  }
+}
+
+let savingWine = false;
+
+async function saveWine() {
+  if (savingWine) return;
+  savingWine = true;
+  const btn = document.querySelector('#wine-modal .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    const vino = {
+      nombre:        document.getElementById('wv-nombre').value.trim(),
+      bodega:        document.getElementById('wv-bodega').value.trim(),
+      varietal:      document.getElementById('wv-varietal').value.trim(),
+      precio_compra: Number(document.getElementById('wv-compra').value),
+      precio_venta:  Number(document.getElementById('wv-venta').value),
+      stock_inicial: Number(document.getElementById('wv-stock-inicial').value),
+      stock_actual:  Number(document.getElementById('wv-stock-actual').value),
+    };
+    if (!vino.nombre) { alert('El nombre es obligatorio'); return; }
+
+    let error;
+    if (editingWineId) {
+      ({ error } = await supabase.from('vinos').update(vino).eq('id', editingWineId));
+    } else {
+      ({ error } = await supabase.from('vinos').insert([vino]));
+    }
+    if (error) { console.error(error); alert('Error guardando vino'); return; }
+    closeWineModal();
+    await loadVinos();
+  } finally {
+    savingWine = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  }
+}
+
+async function deleteWine(id) {
+  const vino = vinos.find(v => v.id === id);
+  if (!vino || !confirm(`¿Eliminar vino "${vino.nombre}"?`)) return;
+  const { error } = await supabase.from('vinos').delete().eq('id', id);
+  if (error) { console.error(error); alert('Error eliminando vino'); return; }
+  await loadVinos();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT MODAL — CSV de clientes, ventas o financiero
+// ══════════════════════════════════════════════════════════════════════════════
+let exportTab = 'clientes';
+
+function openExportModal() {
+  exportTab = 'clientes';
+  document.getElementById('export-modal').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+  updateExportPreview();
+}
+
+function closeExportModal() {
+  document.getElementById('export-modal').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+function switchExportTab(tab) {
+  exportTab = tab;
+  document.querySelectorAll('.export-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(`etab-${tab}`).classList.add('active');
+  updateExportPreview();
+}
+
+function getExportData() {
+  const q = v => `"${String(v || '').replace(/"/g, '""')}"`;
+
+  if (exportTab === 'clientes') {
+    const headers = ['Empresa','Tipo','País','Contacto','Teléfono','Email','Dirección','Estado','Último Contacto','Vía','Próximo Seguimiento','Comentario'];
+    const rows = clientes.map(c => [c.empresa,c.tipo,c.pais,c.contacto,c.telefono,c.email,c.direccion,c.estado,c.fecha,c.via,c.proximo,c.nota].map(q).join(','));
+    return { headers, rows };
+  }
+
+  if (exportTab === 'ventas') {
+    const headers = ['Fecha','Cliente','Vino','Cantidad','Precio Unitario','Total','Ganancia Neta','Vendedor','Nota'];
+    const rows = ventas.map(v => {
+      const gan = calcVentaGanancia(v);
+      return [v.fecha,v.cliente_nombre,v.vino_nombre,v.cantidad,v.precio_unitario,v.total,gan.toFixed(2),v.vendedor,v.nota].map(q).join(',');
+    });
+    return { headers, rows };
+  }
+
+  // financiero
+  const porCliente = {};
+  ventas.forEach(v => {
+    if (!porCliente[v.cliente_id]) {
+      porCliente[v.cliente_id] = { nombre: v.cliente_nombre, compras: 0, botellas: 0, total: 0, costo: 0, ganancia: 0, ultima: null };
+    }
+    const row  = porCliente[v.cliente_id];
+    const vino = vinos.find(vi => vi.id === v.vino_id);
+    const cpra = vino ? Number(vino.precio_compra || 0) : 0;
+    const cant = Number(v.cantidad || 0);
+    const tot  = Number(v.total || 0);
+    row.compras++;
+    row.botellas += cant;
+    row.total    += tot;
+    row.costo    += cpra * cant;
+    row.ganancia += tot - cpra * cant;
+    if (!row.ultima || v.fecha > row.ultima) row.ultima = v.fecha;
+  });
+  const headers = ['Cliente','Compras','Botellas','Total Gastado','Costo Total','Ganancia Neta','Última Compra'];
+  const rows = Object.values(porCliente).sort((a,b) => b.total - a.total).map(r =>
+    [r.nombre, r.compras, r.botellas, r.total.toFixed(2), r.costo.toFixed(2), r.ganancia.toFixed(2), r.ultima].map(q).join(',')
+  );
+  return { headers, rows };
+}
+
+function updateExportPreview() {
+  const { headers, rows } = getExportData();
+  const preview = [headers.join(','), ...rows.slice(0, 3)].join('\n');
+  document.getElementById('export-preview').textContent = preview || '(sin datos)';
+}
+
+function doExportCSV() {
+  const { headers, rows } = getExportData();
+  const csv  = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `crm_vinos_${exportTab}_${today()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  closeExportModal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATISTICS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderStats() {
+  const t = today();
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  const in7      = d.toISOString().split('T')[0];
+  const total    = clientes.length;
+  const cerrados = clientes.filter(c => c.estado === 'Cerrado').length;
+  const pendientes = pendingClientes().length;
+  const prox7    = clientes.filter(c => c.proximo && c.proximo > t && c.proximo <= in7 && c.estado !== 'Cerrado' && c.estado !== 'No interesa').length;
+  const conv     = total > 0 ? Math.round(cerrados / total * 100) : 0;
+  const facturacion    = ventas.reduce((acc, v) => acc + Number(v.total || 0), 0);
+  const gananciaTotal  = ventas.reduce((acc, v) => acc + calcVentaGanancia(v), 0);
+  const botellasVendidas = ventas.reduce((acc, v) => acc + Number(v.cantidad || 0), 0);
+
+  document.getElementById('stats-grid-2').innerHTML = [
+    { label: 'Total Clientes',          num: total,                           hl: false },
+    { label: 'Tasa de conversión',      num: conv + '%',                      hl: false },
+    { label: 'Seguimientos pendientes', num: pendientes,                      hl: pendientes > 0 },
+    { label: 'Próximos 7 días',         num: prox7,                           hl: false },
+    { label: 'Facturación Total',       num: `€ ${facturacion.toFixed(2)}`,   hl: false },
+    { label: 'Ganancia Neta Total',     num: `€ ${gananciaTotal.toFixed(2)}`, hl: false },
+    { label: 'Botellas Vendidas',       num: botellasVendidas,                hl: false },
+  ].map(d => `
+    <div class="stat-card ${d.hl ? 'highlight' : ''}">
+      <div class="stat-label">${d.label}</div>
+      <div class="stat-num ${String(d.num).length > 8 ? 'small' : ''}">${d.num}</div>
+    </div>
+  `).join('');
+
+  renderCharts();
+}
+
+function renderCharts() {
+  const font = "'Plus Jakarta Sans', sans-serif";
+  const borderRadius = 6;
+  const gridColor  = '#e8dde0';
+  const textColor  = '#6b5057';
+
+  // Estado
+  const estadoLabels = ['Nuevo','Contactado','Interesado','Cerrado','No interesa'];
+  const estadoBG     = ['#0C447C','#633806','#27500A','#085041','#791F1F'];
+  if (chartEstado) chartEstado.destroy();
+  chartEstado = new Chart(document.getElementById('chart-estado'), {
+    type: 'bar',
+    data: { labels: estadoLabels, datasets: [{ data: estadoLabels.map(e => clientes.filter(c => c.estado === e).length), backgroundColor: estadoBG, borderRadius }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } }, y: { grid: { color: gridColor }, ticks: { precision: 0, font: { family: font }, color: textColor }, beginAtZero: true } } }
+  });
+
+  // País
+  const paisCounts = {};
+  clientes.forEach(c => { if (c.pais) paisCounts[c.pais] = (paisCounts[c.pais]||0)+1; });
+  if (chartPais) chartPais.destroy();
+  chartPais = new Chart(document.getElementById('chart-pais'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(paisCounts), datasets: [{ data: Object.values(paisCounts), backgroundColor: ['#7B1F3A','#C45C7A','#E8A0B0'], hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { font: { family: font }, color: textColor, padding: 14 } } } }
+  });
+
+  // Tipo
+  const tipoCounts = {};
+  clientes.forEach(c => { if (c.tipo) tipoCounts[c.tipo] = (tipoCounts[c.tipo]||0)+1; });
+  const tipoEntries = Object.entries(tipoCounts).sort((a,b) => b[1]-a[1]);
+  if (chartTipo) chartTipo.destroy();
+  chartTipo = new Chart(document.getElementById('chart-tipo'), {
+    type: 'bar',
+    data: { labels: tipoEntries.map(e=>e[0]), datasets: [{ data: tipoEntries.map(e=>e[1]), backgroundColor: '#7B1F3A', borderRadius }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: { precision: 0, font: { family: font }, color: textColor } }, y: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } } } }
+  });
+
+  // Vinos más vendidos
+  const vinosCounts = {};
+  ventas.forEach(v => { if (v.vino_nombre) vinosCounts[v.vino_nombre] = (vinosCounts[v.vino_nombre]||0) + Number(v.cantidad||0); });
+  const vinosEntries = Object.entries(vinosCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if (chartVinos) chartVinos.destroy();
+  chartVinos = new Chart(document.getElementById('chart-vinos'), {
+    type: 'bar',
+    data: { labels: vinosEntries.map(v=>v[0]), datasets: [{ label: 'Botellas', data: vinosEntries.map(v=>v[1]), backgroundColor: '#7B1F3A', borderRadius }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } }, y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0, font: { family: font }, color: textColor } } } }
+  });
+
+  // ── NUEVO: Ganancia por vino ──
+  const gananciaPorVino = {};
+  ventas.forEach(v => {
+    const vino  = vinos.find(vi => vi.id === v.vino_id);
+    const cpra  = vino ? Number(vino.precio_compra || 0) : 0;
+    const gan   = (Number(v.precio_unitario||0) - cpra) * Number(v.cantidad||0);
+    if (v.vino_nombre) gananciaPorVino[v.vino_nombre] = (gananciaPorVino[v.vino_nombre]||0) + gan;
+  });
+  const ganEntries = Object.entries(gananciaPorVino).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if (chartGanancias) chartGanancias.destroy();
+  chartGanancias = new Chart(document.getElementById('chart-ganancias'), {
+    type: 'bar',
+    data: {
+      labels: ganEntries.map(g=>g[0]),
+      datasets: [{
+        label: 'Ganancia (€)',
+        data: ganEntries.map(g=>g[1]),
+        backgroundColor: ganEntries.map(g => g[1] >= 0 ? '#166534' : '#991b1b'),
+        borderRadius
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` € ${Number(ctx.raw).toFixed(2)}` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } },
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { family: font }, color: textColor, callback: v => '€ ' + v } }
+      }
+    }
+  });
+
+  // Actividad mensual
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const now    = new Date();
+  const last6  = Array.from({ length: 6 }, (_, i) => {
+    const d2 = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return { key: `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}`, label: months[d2.getMonth()] };
+  });
+  const totals = {};
+  ventas.forEach(v => { if (v.fecha) { const key = v.fecha.slice(0,7); totals[key] = (totals[key]||0) + Number(v.total||0); } });
+  if (chartActividad) chartActividad.destroy();
+  chartActividad = new Chart(document.getElementById('chart-actividad'), {
+    type: 'bar',
+    data: { labels: last6.map(m=>m.label), datasets: [{ label: 'Facturación', data: last6.map(m=>totals[m.key]||0), backgroundColor: '#7B1F3A', borderRadius }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` € ${Number(ctx.raw).toFixed(2)}` } } }, scales: { x: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } }, y: { grid: { color: gridColor }, ticks: { font: { family: font }, color: textColor, callback: v => '€ ' + v }, beginAtZero: true } } }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EVENT LISTENERS
+// ══════════════════════════════════════════════════════════════════════════════
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('filterEstado').addEventListener('change', renderTable);
+document.getElementById('filterPais').addEventListener('change', renderTable);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL EXPORTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function closeEditHistoryModal() {
+
+  document.getElementById('edit-history-modal')
+    .classList.remove('open');
+
+  document.getElementById('overlay')
+    .classList.remove('open');
+}
+
+function addEditWineLine() {
+
+  const container = document.getElementById('eh-wines');
+
+  container.insertAdjacentHTML('beforeend', `
+    <div class="edit-wine-line" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-top:.75rem;">
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:.6rem;">
+
+        <div class="form-group">
+          <label>Vino</label>
+
+          <select class="edit-vino">
+            ${vinos.map(v => `
+              <option value="${v.id}">
+                ${v.nombre}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Cantidad</label>
+
+          <input
+            type="number"
+            class="edit-cantidad"
+            value="1"
+            min="1"
+          >
+        </div>
+
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-ghost"
+        style="color:#b91c1c"
+        onclick="this.closest('.edit-wine-line').remove()"
+      >
+        Eliminar vino
+      </button>
+
+    </div>
+  `);
+}
+
+async function saveEditedHistory() {
+
+  const cliente = clientes.find(
+    c => c.id === editingHistoryClienteId
+  );
+
+  if (!cliente) return;
+
+  const historialItem = cliente.historial.find(
+    h => String(h.id) === String(editingHistoryId)
+  );
+
+  if (!historialItem) return;
+
+  // DEVOLVER STOCK VIEJO
+
+  if (historialItem.ventas) {
+
+    for (const venta of historialItem.ventas) {
+
+      const vino = vinos.find(
+        v => v.id === venta.vinoId
+      );
+
+      if (vino) {
+
+        await supabase
+          .from('vinos')
+          .update({
+            stock_actual:
+              Number(vino.stock_actual || 0) +
+              Number(venta.cantidad || 0)
+          })
+          .eq('id', venta.vinoId);
+      }
+    }
+  }
+
+  // BORRAR VENTAS VIEJAS
+
+  await supabase
+    .from('ventas')
+    .delete()
+    .eq('cliente_id', editingHistoryClienteId)
+    .eq('fecha', historialItem.fecha);
+
+  // NUEVAS VENTAS
+
+  const nuevasVentas = [];
+
+  const lines = [
+    ...document.querySelectorAll('.edit-wine-line')
+  ];
+
+  for (const line of lines) {
+
+    const vinoId = line.querySelector('.edit-vino').value;
+
+    const cantidad = Number(
+      line.querySelector('.edit-cantidad').value || 0
+    );
+
+    const vino = vinos.find(v => v.id === vinoId);
+
+    if (!vino || cantidad <= 0) continue;
+
+    const precio = Number(vino.precio_venta || 0);
+
+    nuevasVentas.push({
+      vinoId,
+      vinoNombre: vino.nombre,
+      cantidad,
+      precio,
+      total: precio * cantidad
+    });
+
+    // DESCONTAR STOCK NUEVO
+
+    await supabase
+      .from('vinos')
+      .update({
+        stock_actual:
+          Number(vino.stock_actual || 0) -
+          cantidad
+      })
+      .eq('id', vinoId);
+
+    // INSERTAR NUEVA VENTA
+
+    await supabase
+      .from('ventas')
+      .insert([{
+        cliente_id: cliente.id,
+        cliente_nombre: cliente.empresa,
+        vino_id: vinoId,
+        vino_nombre: vino.nombre,
+        cantidad,
+        precio_unitario: precio,
+        total: precio * cantidad,
+        fecha: document.getElementById('eh-fecha').value,
+        vendedor: historialItem.vendedor || '',
+        nota: document.getElementById('eh-nota').value
+      }]);
+  }
+
+  // ACTUALIZAR HISTORIAL
+
+  const historialActualizado = cliente.historial.map(h => {
+
+    if (String(h.id) === String(editingHistoryId)) {
+
+      return {
+        ...h,
+        fecha: document.getElementById('eh-fecha').value,
+        via: document.getElementById('eh-via').value,
+        nota: document.getElementById('eh-nota').value,
+        ventas: nuevasVentas,
+        total_general: nuevasVentas.reduce(
+          (acc, v) => acc + v.total,
+          0
+        )
+      };
+    }
+
+    return h;
+  });
+
+  const { error } = await supabase
+    .from('clientes')
+    .update({
+      historial: historialActualizado
+    })
+    .eq('id', cliente.id);
+
+  if (error) {
+
+    console.error(error);
+
+    alert('Error actualizando historial');
+
+    return;
+  }
+
+  closeEditHistoryModal();
+
+  await loadClientes();
+  await loadVinos();
+  await loadVentas();
+
+  openSheet(cliente.id);
+}
+
+window.renderTable      = renderTable;
+window.renderFinanciero = renderFinanciero;
+window.openModal        = openModal;
+window.closeModal       = closeModal;
+window.saveCliente      = saveCliente;
+window.deleteCliente    = deleteCliente;
+window.openSheet        = openSheet;
+window.closeSheet       = closeSheet;
+window.showPage         = showPage;
+window.filterPendientes = filterPendientes;
+window.openExportModal  = openExportModal;
+window.closeExportModal = closeExportModal;
+window.switchExportTab  = switchExportTab;
+window.doExportCSV      = doExportCSV;
+window.editFromSheet    = editFromSheet;
+window.deleteFromSheet  = deleteFromSheet;
+window.saveNewContact   = saveNewContact;
+window.openWineModal    = openWineModal;
+window.closeWineModal   = closeWineModal;
+window.saveWine         = saveWine;
+window.deleteWine       = deleteWine;
+window.updateWineInfo   = updateWineInfo;
+window.editHistorial    = editHistorial;
+window.deleteHistorial  = deleteHistorial;
+window.addWineLine      = addWineLine;
+window.removeWineLine   = removeWineLine;
+window.closeEditHistoryModal = closeEditHistoryModal;
+window.addEditWineLine = addEditWineLine;
+window.saveEditedHistory = saveEditedHistory;
+
+</script>
+</body>
+</html>

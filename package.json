@@ -1,0 +1,29 @@
+{
+  "name": "crm-vinos",
+  "version": "1.0.5",
+  "description": "CRM para venta de vinos argentinos",
+  "author": "Brian",
+  "main": "main.js",
+  "scripts": {
+  "start": "electron .",
+  "dist": "electron-builder"
+},
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "vite": "^8.0.12"
+  },
+  "build": {
+    "appId": "com.crmvinos.app",
+    "productName": "CRM Vinos",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4"
+  }
+}
