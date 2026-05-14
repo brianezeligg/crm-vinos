@@ -159,7 +159,11 @@ tbody tr:hover { background: var(--bg-secondary); }
 tbody tr.overdue { border-left-color: #b91c1c; background: rgba(185,28,28,.12); }
 tbody tr.overdue .td-empresa { color: #991b1b; font-weight: 700; }
 tbody tr.low-stock { border-left-color: #dc2626; }
-tbody td { padding: .7rem 1rem; vertical-align: middle; }
+tbody td {
+  padding: .7rem 1rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .td-empresa { font-weight: 600; }
 .td-muted { color: var(--text-muted); }
 .td-note { color: var(--text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -732,7 +736,7 @@ async function login() {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) { 
   console.error(error);
-  alert(JSON.stringify(error, null, 2));
+  alert('Email o contraseña incorrectos');
   return; 
 }
   checkAuth();
@@ -1150,12 +1154,12 @@ function openModal(id) {
   document.getElementById('f-proximo').value   = c.proximo   || '';
   document.getElementById('f-nota').value      = c.nota      || '';
   document.getElementById('modal').classList.add('open');
-  document.getElementById('overlay').classList.add('open');
+  syncOverlay();
 }
 
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
-  document.getElementById('overlay').classList.remove('open');
+  syncOverlay();
   editingId = null;
 }
 
@@ -1416,13 +1420,13 @@ function openSheet(id) {
   `;
 
   document.getElementById('sheet').classList.add('open');
-  document.getElementById('overlay').classList.add('open');
+  syncOverlay();
 }
 
 function closeSheet() {
   document.getElementById('sheet').classList.remove('open');
-  document.getElementById('overlay').classList.remove('open');
   sheetId = null;
+  syncOverlay();
 }
 
 function editFromSheet()   { if (sheetId) openModal(sheetId); }
@@ -1485,7 +1489,7 @@ const entry = {
 
     const clienteActual = clientes.find(c => c.id === sheetId);
     const hist = [entry, ...(clienteActual.historial || [])].sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+      (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
     );
 
     const { error } = await supabase.from('clientes').update({
@@ -1499,14 +1503,22 @@ const entry = {
     for (const venta of ventasLineas) {
       const vino       = vinos.find(v => v.id === venta.vinoId);
       if (!vino) continue;
-      const nuevoStock = Number(vino.stock_actual || 0) - venta.cantidad;
+      const stockActual = Number(vino.stock_actual || 0);
+
+if (venta.cantidad > stockActual) {
+  alert(`Stock insuficiente para ${vino.nombre}`);
+  return;
+}
+
+const nuevoStock = stockActual - venta.cantidad;
 
       const { error: stockError } = await supabase.from('vinos')
         .update({ stock_actual: nuevoStock }).eq('id', venta.vinoId);
       if (stockError) { console.error(stockError); alert('Error actualizando stock'); return; }
 
-      const { error: ventaError } = await supabase.from('ventas').insert([{
-        cliente_id:      clienteActual.id,
+     const { error: ventaError } = await supabase.from('ventas').insert([{
+  historial_id: entry.id,
+  cliente_id:      clienteActual.id,
         vino_id:         venta.vinoId,
         cliente_nombre:  clienteActual.empresa,
         vino_nombre:     venta.vinoNombre,
@@ -1665,12 +1677,10 @@ async function deleteHistorial(clienteId, historialId) {
       // BORRAR VENTAS
       // ─────────────────────────────────────
 
-      const { error: ventaError } = await supabase
-        .from('ventas')
-        .delete()
-        .eq('cliente_id', clienteId)
-        .eq('vino_id', venta.vinoId)
-        .eq('fecha', historialItem.fecha);
+     const { error: ventaError } = await supabase
+  .from('ventas')
+  .delete()
+  .eq('historial_id', historialItem.id);
 
       if (ventaError) {
         console.error(ventaError);
@@ -1804,6 +1814,11 @@ let editingHistoryClienteId = null;
 let editingHistoryId = null;
 
 function openWineModal(id = null) {
+const existingWineModal = document.getElementById('wine-modal');
+
+if (existingWineModal) {
+  existingWineModal.remove();
+}
   editingWineId = id;
   const vino = id ? vinos.find(v => v.id === id) : {};
   document.body.insertAdjacentHTML('beforeend', `
@@ -1851,7 +1866,7 @@ function openWineModal(id = null) {
       </div>
     </div>
   `);
-  document.getElementById('overlay').classList.add('open');
+  
 
   // Calculo en tiempo real del margen
   ['wv-compra','wv-venta'].forEach(id => {
@@ -1873,12 +1888,14 @@ function openWineModal(id = null) {
 }
 
 function closeWineModal() {
+
   const modal = document.getElementById('wine-modal');
-  if (modal) modal.remove();
-  const overlay = document.getElementById('overlay');
-  if (overlay && !document.getElementById('modal').classList.contains('open') && !document.getElementById('sheet').classList.contains('open')) {
-    overlay.classList.remove('open');
+
+  if (modal) {
+    modal.remove();
   }
+
+  syncOverlay();
 }
 
 let savingWine = false;
@@ -1997,7 +2014,14 @@ function updateExportPreview() {
   document.getElementById('export-preview').textContent = preview || '(sin datos)';
 }
 
+let exportingCSV = false;
+
 function doExportCSV() {
+
+  if (exportingCSV) return;
+
+  exportingCSV = true;
+
   const { headers, rows } = getExportData();
   const csv  = '\uFEFF' + [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2009,7 +2033,11 @@ function doExportCSV() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  closeExportModal();
+    closeExportModal();
+
+  setTimeout(() => {
+    exportingCSV = false;
+  }, 1000);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2142,6 +2170,24 @@ function renderCharts() {
   });
 }
 
+function syncOverlay() {
+
+  const hasModal =
+  document.getElementById('modal')?.classList.contains('open') ||
+  document.getElementById('sheet')?.classList.contains('open') ||
+  document.getElementById('export-modal')?.classList.contains('open') ||
+  document.getElementById('edit-history-modal')?.classList.contains('open') ||
+  document.getElementById('wine-modal')?.classList.contains('open');
+
+  const overlay = document.getElementById('overlay');
+
+  if (hasModal) {
+    overlay.classList.add('open');
+  } else {
+    overlay.classList.remove('open');
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2158,8 +2204,7 @@ function closeEditHistoryModal() {
   document.getElementById('edit-history-modal')
     .classList.remove('open');
 
-  document.getElementById('overlay')
-    .classList.remove('open');
+  syncOverlay();
 }
 
 function addEditWineLine() {
@@ -2250,10 +2295,10 @@ async function saveEditedHistory() {
   // BORRAR VENTAS VIEJAS
 
   await supabase
-    .from('ventas')
-    .delete()
-    .eq('cliente_id', editingHistoryClienteId)
-    .eq('fecha', historialItem.fecha);
+  .from('ventas')
+  .delete()
+  .eq('historial_id', historialItem.id);
+ await loadVinos();
 
   // NUEVAS VENTAS
 
@@ -2287,21 +2332,34 @@ async function saveEditedHistory() {
 
     // DESCONTAR STOCK NUEVO
 
-    await supabase
-      .from('vinos')
-      .update({
-        stock_actual:
-          Number(vino.stock_actual || 0) -
-          cantidad
-      })
-      .eq('id', vinoId);
+    const stockActual = Number(vino.stock_actual || 0);
+
+if (cantidad > stockActual) {
+  alert(`No hay stock suficiente para ${vino.nombre}`);
+  return;
+}
+
+const nuevoStock = stockActual - cantidad;
+
+if (nuevoStock < 0) {
+  alert(`Stock insuficiente para ${vino.nombre}`);
+  return;
+}
+
+await supabase
+  .from('vinos')
+  .update({
+    stock_actual: nuevoStock
+  })
+  .eq('id', vinoId);
 
     // INSERTAR NUEVA VENTA
 
     await supabase
-      .from('ventas')
-      .insert([{
-        cliente_id: cliente.id,
+  .from('ventas')
+  .insert([{
+    historial_id: historialItem.id,
+    cliente_id: cliente.id,
         cliente_nombre: cliente.empresa,
         vino_id: vinoId,
         vino_nombre: vino.nombre,
