@@ -11,14 +11,21 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+
+  color-scheme: light;
+
   --primary: #7B1F3A;
   --primary-dark: #5a1629;
   --primary-light: #f9f0f3;
+
   --text: #1a0d11;
   --text-muted: #6b5057;
+
   --bg: #ffffff;
   --bg-secondary: #faf7f8;
+
   --border: #e8dde0;
+
   --card: #ffffff;
   --amber-bg: #fffbeb;
   --amber-border: #fde68a;
@@ -34,24 +41,163 @@
   --font-serif: 'Playfair Display', serif;
 }
 
-body { font-family: var(--font-sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+body {
+
+  font-family: var(--font-sans);
+
+  background: var(--bg);
+
+  color: var(--text);
+
+  min-height: 100vh;
+
+  transition:
+    background .25s,
+    color .25s;
+
+}
+
+body.dark {
+
+  --bg: #0f0a0c;
+
+  --bg-secondary: #181113;
+
+  --card: #1b1416;
+
+  --border: rgba(255,255,255,.06);
+
+  --text: #f7f3f4;
+
+  --text-muted: #b8a6ac;
+
+  --primary-light: rgba(123,31,58,.16);
+
+  color-scheme: dark;
+
+}
+
+body.dark .stat-card {
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(27,20,22,.96),
+      rgba(20,15,17,.92)
+    );
+
+  border:
+    1px solid rgba(255,255,255,.04);
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.35);
+
+}
+
+body.dark .stat-card:hover {
+
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.5);
+
+}
+
+body.dark input,
+body.dark select,
+body.dark textarea {
+
+  background: rgba(255,255,255,.03);
+
+  border: 1px solid rgba(255,255,255,.06);
+
+  color: var(--text);
+
+}
+
+body.dark input:focus,
+body.dark select:focus,
+body.dark textarea:focus {
+
+  background: rgba(255,255,255,.05);
+
+}
+
 
 .app { display: flex; flex-direction: column; min-height: 100vh; }
 
 header {
-  background: var(--primary);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(123,31,58,.92),
+      rgba(90,22,41,.88)
+    );
+
   color: white;
+
   padding: 0 1.5rem;
-  height: 60px;
+
+  height: 68px;
+
   display: flex;
+
   align-items: center;
+
   justify-content: space-between;
-  position: sticky; top: 0; z-index: 50;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+
+  position: sticky;
+
+  top: 0;
+
+  z-index: 50;
+
+  backdrop-filter: blur(18px);
+
+  border-bottom:
+    1px solid rgba(255,255,255,.08);
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.18);
+
 }
-.header-brand { display: flex; align-items: center; gap: .6rem; font-family: var(--font-serif); font-size: 1.2rem; font-weight: 700; }
+
+.header-brand {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: .75rem;
+
+  font-family: var(--font-serif);
+
+  font-size: 1.35rem;
+
+  font-weight: 700;
+
+  letter-spacing: .4px;
+
+}
 .header-brand svg { width: 22px; height: 22px; }
-.nav-tabs { display: flex; gap: 4px; background: rgba(255,255,255,.12); padding: 4px; border-radius: 8px; }
+.nav-tabs {
+
+  display: flex;
+
+  gap: 4px;
+
+  background: rgba(255,255,255,.08);
+
+  padding: 5px;
+
+  border-radius: 14px;
+
+  backdrop-filter: blur(12px);
+
+  border:
+    1px solid rgba(255,255,255,.08);
+
+}
+
 .nav-tab {
   padding: 5px 16px; border-radius: 6px; font-size: .85rem; font-weight: 500;
   cursor: pointer; border: none; background: none; color: rgba(255,255,255,.75);
@@ -64,23 +210,196 @@ header {
 .page.active { display: flex; flex-direction: column; gap: 1.25rem; }
 
 .stats-grid {
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: .75rem;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(210px, 1fr));
+
+  gap: .9rem;
+
+  align-items: stretch;
+
 }
-@media (max-width: 640px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .toolbar-actions .btn {
+    flex: 1;
+  }
+
+  .toolbar-selects {
+    flex-direction: column;
+  }
+
+  .toolbar-selects select {
+    width: 100%;
+  }
+
+  .search-wrap {
+    width: 100%;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 980px;
+  }
+
+  .modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-footer {
+    flex-wrap: wrap;
+  }
+
+  .sheet-footer .btn {
+    flex: 1;
+  }
+
+}
+
 .stat-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+
+  position: relative;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,.96),
+      rgba(250,247,248,.92)
+    );
+
+  border:
+    1px solid rgba(255,255,255,.7);
+
+  border-radius: 22px;
+
+  padding: 1rem 1.25rem;
+
+  backdrop-filter: blur(12px);
+
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.05);
+
+  transition:
+    transform .18s,
+    box-shadow .18s,
+    border-color .18s;
+
 }
-.stat-card.highlight { background: var(--primary); border-color: var(--primary); color: white; }
-.stat-card.highlight .stat-label { color: rgba(255,255,255,.75); }
-.stat-card.positive { background: var(--green-bg); border-color: var(--green-border); }
-.stat-card.positive .stat-label { color: var(--green-text); }
-.stat-card.positive .stat-num { color: var(--green-text); }
-.stat-num { font-family: var(--font-serif); font-size: 2rem; font-weight: 700; line-height: 1; margin-top: .25rem; }
-.stat-num.small { font-size: 1.4rem; }
-.stat-label { font-size: .75rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.stat-card:hover {
+
+  transform: translateY(-3px);
+
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.08);
+
+  border-color:
+    rgba(123,31,58,.12);
+
+}
+
+.stat-card::before {
+
+  content:'';
+
+  position:absolute;
+
+  top:0;
+  left:0;
+  right:0;
+
+  height:4px;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--primary),
+      #b46b7d
+    );
+
+  opacity:.9;
+
+}
+
+.stat-card.highlight {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.stat-card.highlight .stat-label {
+  color: rgba(255,255,255,.75);
+}
+
+.stat-card.positive {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.stat-card.positive .stat-label {
+  color: var(--green-text);
+}
+
+.stat-card.positive .stat-num {
+  color: var(--green-text);
+}
+
+.stat-num {
+
+  font-family: var(--font-serif);
+
+  font-size: 1.8rem;
+
+  font-weight: 700;
+
+  line-height: 1.1;
+
+  margin-top: .25rem;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+}
+
+.stat-num.small {
+  font-size: 1.4rem;
+}
+.stat-label {
+
+  font-size: .72rem;
+
+  font-weight: 600;
+
+  color: var(--text-muted);
+
+  text-transform: uppercase;
+
+  letter-spacing: .08em;
+
+}
+
 
 /* ALERT BANNERS */
 .alert-banner {
@@ -274,7 +593,25 @@ table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 thead th { background: var(--bg-secondary); color: var(--text-muted); font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; cursor: pointer; border-left: 4px solid transparent; }
 tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: var(--bg-secondary); }
+tbody tr {
+
+  transition:
+    background .18s,
+    transform .14s,
+    box-shadow .18s;
+
+}
+
+tbody tr:hover {
+
+  background: rgba(123,31,58,.03);
+
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 8px 24px rgba(0,0,0,.04);
+
+}
 tbody tr.overdue { border-left-color: #b91c1c; background: rgba(185,28,28,.12); }
 tbody tr.overdue .td-empresa { color: #991b1b; font-weight: 700; }
 tbody tr.low-stock { border-left-color: #dc2626; }
@@ -289,7 +626,42 @@ tbody td {
 .td-actions { text-align: right; white-space: nowrap; }
 .td-hover-info { font-size: .72rem; color: var(--text-muted); margin-top: 2px; display: none; }
 tbody tr:hover .td-hover-info { display: block; }
-.empty-state { text-align: center; padding: 3rem; color: var(--text-muted); font-size: .9rem; }
+.row-pending {
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(123,31,58,.08),
+      transparent 140px
+    );
+
+  border-left:
+    4px solid var(--primary);
+
+}
+
+.row-pending:hover {
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(123,31,58,.14),
+      rgba(123,31,58,.03)
+    );
+
+}
+
+.empty-state {
+
+  text-align: center;
+
+  padding: 3rem;
+
+  color: var(--text-muted);
+
+  font-size: .9rem;
+
+}
 
 /* BADGES */
 .badge {
@@ -307,6 +679,24 @@ tbody tr:hover .td-hover-info { display: block; }
 .badge-loss      { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 .badge-stock-low { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
 .badge-stock-ok  { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+.priority-high {
+  background:#fef2f2;
+  color:#991b1b;
+  border:1px solid #fecaca;
+}
+
+.priority-medium {
+  background:#fffbeb;
+  color:#92400e;
+  border:1px solid #fde68a;
+}
+
+.priority-low {
+  background:#f3f4f6;
+  color:#4b5563;
+  border:1px solid #d1d5db;
+}
 
 /* OVERLAY / SHEET */
 .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 100; }
@@ -483,6 +873,42 @@ tbody tr:hover .td-hover-info { display: block; }
   }
 
 }
+
+@keyframes modalPop {
+
+  from {
+
+    opacity:0;
+
+    transform:
+      translateY(18px)
+      scale(.96);
+
+  }
+
+  to {
+
+    opacity:1;
+
+    transform:
+      translateY(0)
+      scale(1);
+
+  }
+
+}
+
+@keyframes fadeModalBg {
+
+  from {
+    opacity:0;
+  }
+
+  to {
+    opacity:1;
+  }
+
+}
 </style>
 </head>
 <body>
@@ -642,13 +1068,32 @@ transition:.2s;
     👤 —
   </div>
 
-  <nav class="nav-tabs">
+ <nav class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('clientes')">Clientes</button>
       <button class="nav-tab" onclick="showPage('vinos')">Vinos</button>
       <button class="nav-tab" onclick="showPage('financiero')">Financiero</button>
       <button class="nav-tab" onclick="showPage('estadisticas')">Estadísticas</button>
     </nav>
-    <button class="btn btn-outline" onclick="logout()">Salir</button>
+
+    <div style="display:flex;align-items:center;gap:.5rem;">
+
+      <button
+        class="btn btn-outline"
+        onclick="toggleDarkMode()"
+        id="dark-btn"
+      >
+        🌙
+      </button>
+
+      <button
+        class="btn btn-outline"
+        onclick="logout()"
+      >
+        Salir
+      </button>
+
+    </div>
+
   </div>
 </header>
 
@@ -699,7 +1144,7 @@ transition:.2s;
       <thead>
         <tr>
           <th>Empresa</th><th>Tipo</th><th>País</th><th>Contacto</th>
-          <th>Estado</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
+          <th>Estado</th><th>Prioridad</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -1051,10 +1496,14 @@ import { supabase } from './supabase.js'
 
 window.login = login;
 window.logout = logout;
+window.toggleDarkMode = toggleDarkMode;
+
+loadDarkMode();
 
 checkAuth();
 
 supabase.auth.onAuthStateChange(() => { checkAuth(); });
+
 
 async function checkAuth() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -1095,6 +1544,50 @@ async function logout() {
   await supabase.auth.signOut();
   checkAuth();
 }
+
+function toggleDarkMode() {
+
+  document.body.classList.toggle('dark');
+
+  const enabled =
+    document.body.classList.contains('dark');
+
+  localStorage.setItem(
+    'crm_dark_mode',
+    enabled
+  );
+
+  updateDarkButton();
+
+}
+
+function loadDarkMode() {
+
+  const enabled =
+    localStorage.getItem('crm_dark_mode') === 'true';
+
+  if (enabled) {
+    document.body.classList.add('dark');
+  }
+
+  updateDarkButton();
+
+}
+
+function updateDarkButton() {
+
+  const btn =
+    document.getElementById('dark-btn');
+
+  if (!btn) return;
+
+  btn.textContent =
+    document.body.classList.contains('dark')
+      ? '☀️'
+      : '🌙';
+
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DATA
@@ -1172,6 +1665,35 @@ function stateBadge(estado) {
   return `<span class="badge" style="background:${c.bg};color:${c.text}">${esc(estado)}</span>`;
 }
 
+function getPrioridad(cliente) {
+
+  const overdue =
+    cliente.proximo &&
+    cliente.proximo <= today() &&
+    cliente.estado !== 'Cerrado' &&
+    cliente.estado !== 'No interesa';
+
+  if (overdue) {
+    return {
+      label: '🔴 Alta',
+      class: 'priority-high'
+    };
+  }
+
+  if (cliente.estado === 'Interesado') {
+    return {
+      label: '🟡 Media',
+      class: 'priority-medium'
+    };
+  }
+
+  return {
+    label: '⚪ Baja',
+    class: 'priority-low'
+  };
+
+}
+
 function pendingClientes() {
   return clientes.filter(c =>
     c.proximo &&
@@ -1180,6 +1702,7 @@ function pendingClientes() {
     c.estado !== 'No interesa'
   );
 }
+
 
 function getStockThreshold() {
   const el = document.getElementById('stock-threshold');
@@ -1250,21 +1773,42 @@ function renderTable() {
   const tbody = document.getElementById('tbody');
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
+   tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
-      const overdue = c.proximo && c.proximo <= today() && c.estado !== 'Cerrado' && c.estado !== 'No interesa';
-      return `
-        <tr class="${overdue ? 'overdue' : ''}" onclick="openSheet('${c.id}')">
+    const overdue =
+  c.proximo &&
+  c.proximo <= today() &&
+  c.estado !== 'Cerrado' &&
+  c.estado !== 'No interesa';
+
+const rowClass = overdue
+  ? 'overdue row-pending'
+  : '';
+
+return `
+  <tr
+    class="${rowClass}"
+    onclick="openSheet('${c.id}')"
+  >
           <td class="td-empresa">${esc(c.empresa)}</td>
           <td class="td-muted">${esc(c.tipo)}</td>
           <td class="td-muted">${esc(c.pais)}</td>
-          <td>
+        <td>
             <div>${esc(c.contacto || '—')}</div>
             <div class="td-hover-info">${esc(c.email || '')}${c.email && c.telefono ? ' · ' : ''}${esc(c.telefono || '')}</div>
           </td>
+
           <td>${stateBadge(c.estado)}</td>
+
+          <td>
+            <span class="badge ${getPrioridad(c).class}">
+              ${getPrioridad(c).label}
+            </span>
+          </td>
+
           <td class="td-muted">${esc(c.fecha || '—')}</td>
+
           <td class="td-note" title="${esc(c.nota)}">${esc((c.nota || '').substring(0, 80))}${(c.nota || '').length > 80 ? '…' : ''}</td>
           <td class="td-actions">
             <button class="btn btn-ghost" onclick="event.stopPropagation();openModal('${c.id}')" title="Editar">
@@ -1284,25 +1828,177 @@ function renderTable() {
 }
 
 function renderStatCards() {
+
   const pending = pendingClientes().length;
 
+ const interesados =
+    clientes.filter(c => c.estado === 'Interesado').length;
+
+  const cerrados =
+    clientes.filter(c => c.estado === 'Cerrado').length;
+
+  const conversion =
+    interesados > 0
+      ? Math.round((cerrados / interesados) * 100)
+      : 0;
+
+  const gastoPorCliente = {};
+
+  ventas.forEach(v => {
+
+    if (!gastoPorCliente[v.cliente_nombre]) {
+      gastoPorCliente[v.cliente_nombre] = 0;
+    }
+
+    gastoPorCliente[v.cliente_nombre] +=
+      Number(v.total || 0);
+
+  });
+
+  const topClienteData =
+    Object.entries(gastoPorCliente)
+      .sort((a, b) => b[1] - a[1])[0];
+
+  const topCliente =
+    topClienteData
+      ? topClienteData[0]
+      : '—';
+
+const topClienteTotal =
+    topClienteData
+      ? Math.round(topClienteData[1])
+      : 0;
+
+  const ventasPorVino = {};
+
+  ventas.forEach(v => {
+
+    if (!ventasPorVino[v.vino_nombre]) {
+      ventasPorVino[v.vino_nombre] = 0;
+    }
+
+    ventasPorVino[v.vino_nombre] +=
+      Number(v.cantidad || 0);
+
+  });
+
+  const topVinoData =
+    Object.entries(ventasPorVino)
+      .sort((a, b) => b[1] - a[1])[0];
+
+  const topVino =
+    topVinoData
+      ? topVinoData[0]
+      : '—';
+
+  const topVinoCantidad =
+    topVinoData
+      ? topVinoData[1]
+      : 0;
+
   // Calcula facturación total y ganancia total
+
   const facturacionTotal = ventas.reduce((a, v) => a + Number(v.total || 0), 0);
   const gananciaTotal    = ventas.reduce((a, v) => a + calcVentaGanancia(v), 0);
 
   const data = [
-    { label: 'Total Clientes',    num: clientes.length, hl: false },
-    { label: 'Interesados',       num: clientes.filter(c => c.estado === 'Interesado').length, hl: false },
-    { label: 'Cerrados',          num: clientes.filter(c => c.estado === 'Cerrado').length, hl: false },
-    { label: 'Seguimiento Hoy',   num: pending, hl: pending > 0 },
+  {
+    label: 'Total Clientes',
+    num: clientes.length,
+    hl: false,
+    icon: '👥',
+    class: ''
+  },
+
+  {
+    label: 'Interesados',
+    num: clientes.filter(c => c.estado === 'Interesado').length,
+    hl: false,
+    icon: '🟢',
+    class: 'positive'
+  },
+
+  {
+    label: 'Cerrados',
+    num: clientes.filter(c => c.estado === 'Cerrado').length,
+    hl: false,
+    icon: '🍷',
+    class: ''
+  },
+
+     {
+    label: 'Seguimiento Hoy',
+    num: pending,
+    hl: pending > 0,
+    icon: '🔔',
+    class: pending > 0 ? 'highlight' : ''
+  },
+
+  {
+    label: 'Conversión',
+    num: conversion + '%',
+    hl: false,
+    icon: '📈',
+    class: 'positive'
+  },
+
+  {
+    label: 'Top Cliente',
+    num: topCliente,
+    hl: false,
+    icon: '🏆',
+    class: ''
+  },
+
+      {
+    label: 'Top Facturación',
+    num: '€ ' + topClienteTotal,
+    hl: false,
+    icon: '💰',
+    class: ''
+  },
+
+  {
+    label: 'Vino Más Vendido',
+    num: topVino,
+    hl: false,
+    icon: '🍷',
+    class: ''
+  },
+
+  {
+    label: 'Botellas Vendidas',
+    num: topVinoCantidad,
+    hl: false,
+    icon: '📦',
+    class: ''
+  },
+
   ];
 
+
   document.getElementById('stats-grid').innerHTML = data.map(d =>
-    `<div class="stat-card ${d.hl ? 'highlight' : ''}">
-      <div class="stat-label">${d.label}</div>
-      <div class="stat-num">${d.num}</div>
-    </div>`
-  ).join('');
+  `<div class="stat-card ${d.class}">
+      <div
+        style="
+          display:flex;
+          justify-content:space-between;
+          align-items:flex-start;
+          margin-bottom:.6rem;
+        "
+      >
+        <div class="stat-label">${d.label}</div>
+
+        <div style="font-size:1.2rem">
+          ${d.icon}
+        </div>
+      </div>
+
+      <div class="stat-num">
+        ${d.num}
+      </div>
+  </div>`
+).join('');
 }
 
 function renderAlertBanner() {
