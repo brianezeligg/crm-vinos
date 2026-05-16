@@ -19,14 +19,23 @@ function renderPipeline(){
 
     if(!container) return;
 
-    const items = clientes.filter(c => c.estado === estado);
+    const items = clientes.filter(c => {
 
-    container.innerHTML = items.map(c => `
-      <div class="pipeline-card">
-        <div class="pipeline-company">${c.empresa || '-'}</div>
-        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-      </div>
-    `).join('');
+  const estadoCliente = (c.estado || '')
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  return estadoCliente === estado.toLowerCase();
+
+});
+
+container.innerHTML = items.map(c => `
+  <div class="pipeline-card">
+    <div class="pipeline-company">${c.empresa || '-'}</div>
+    <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
+  </div>
+`).join('');
 
   });
 
@@ -38,7 +47,11 @@ showPage = function(name){
   oldShowPage(name);
 
   if(name === 'pipeline'){
-    renderPipeline();
+
+    setTimeout(() => {
+      renderPipeline();
+    }, 300);
+
   }
 }
 
@@ -1110,6 +1123,25 @@ tbody tr:hover .td-hover-info { display: block; }
   background:#f3f4f6;
   color:#4b5563;
   border:1px solid #d1d5db;
+}
+
+
+.badge-consignacion{
+background:#ede9fe;
+color:#5b21b6;
+border:1px solid #c4b5fd;
+}
+
+.badge-muestra{
+background:#ecfccb;
+color:#3f6212;
+border:1px solid #bef264;
+}
+
+.badge-devolucion{
+background:#e0f2fe;
+color:#075985;
+border:1px solid #7dd3fc;
 }
 
 /* OVERLAY / SHEET */
@@ -2207,6 +2239,16 @@ transition:.2s;
       </div>
 
       <div class="form-group">
+        <label>Tipo movimiento</label>
+        <select id="eh-tipo-movimiento">
+          <option>Venta</option>
+          <option>Consignación</option>
+          <option>Devolución</option>
+          <option>Muestra</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label>Vía</label>
         <select id="eh-via">
           <option>Llamada</option>
@@ -2394,7 +2436,10 @@ async function loadClientes() {
   }))
 }));
 
-  setTimeout(() => { renderTable(); }, 0);
+  setTimeout(() => {
+    renderTable();
+    renderPipeline();
+  }, 0);
 }
 
 let editingId = null;
@@ -3256,6 +3301,16 @@ if (c.logo) {
           <input type="date" id="nc-fecha" value="${today()}">
         </div>
         <div class="form-group">
+          <label>Tipo movimiento</label>
+          <select id="nc-tipo-movimiento">
+            <option>Venta</option>
+            <option>Consignación</option>
+            <option>Devolución</option>
+            <option>Muestra</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label>Vía</label>
           <select id="nc-via">
             <option value="">Seleccione…</option>
@@ -3297,6 +3352,19 @@ if (c.logo) {
   document.getElementById('sheet').classList.add('open');
   syncOverlay();
 }
+
+
+function getTipoMovimientoBadge(tipo){
+
+  if(tipo === 'Consignación') return 'badge-consignacion';
+
+  if(tipo === 'Muestra') return 'badge-muestra';
+
+  if(tipo === 'Devolución') return 'badge-devolucion';
+
+  return 'badge-profit';
+}
+
 
 function closeSheet() {
   document.getElementById('sheet').classList.remove('open');
@@ -3346,6 +3414,7 @@ async function saveNewContact() {
     if (!sheetId) return;
 
     const fecha   = document.getElementById('nc-fecha').value;
+    const tipoMovimiento = document.getElementById('nc-tipo-movimiento').value;
     const via     = document.getElementById('nc-via').value;
     const nota    = document.getElementById('nc-nota').value.trim();
     const proximo = document.getElementById('nc-proximo').value;
@@ -3381,6 +3450,7 @@ const vendedorNombre =
 const entry = {
   id: crypto.randomUUID(),
   fecha,
+  tipoMovimiento,
   via,
   nota,
   ventas: ventasLineas,
@@ -3412,11 +3482,25 @@ if (venta.cantidad > stockActual) {
   return;
 }
 
-const nuevoStock = stockActual - venta.cantidad;
+let nuevoStock = stockActual;
+
+if(
+  tipoMovimiento === 'Venta' ||
+  tipoMovimiento === 'Consignación' ||
+  tipoMovimiento === 'Muestra'
+){
+  nuevoStock = stockActual - venta.cantidad;
+}
+
+if(tipoMovimiento === 'Devolución'){
+  nuevoStock = stockActual + venta.cantidad;
+}
 
       const { error: stockError } = await supabase.from('vinos')
         .update({ stock_actual: nuevoStock }).eq('id', venta.vinoId);
       if (stockError) { console.error(stockError); alert('Error actualizando stock'); return; }
+
+if(tipoMovimiento === 'Venta'){
 
      const { error: ventaError } = await supabase.from('ventas').insert([{
   historial_id: entry.id,
@@ -4383,7 +4467,11 @@ showPage = function(name){
   oldShowPage(name);
 
   if(name === 'pipeline'){
-    renderPipeline();
+
+    setTimeout(() => {
+      renderPipeline();
+    }, 300);
+
   }
 }
 
