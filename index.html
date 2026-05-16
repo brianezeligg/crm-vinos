@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
+
 window.exportBackup = exportBackup;
 
 function renderPipeline(){
@@ -23,26 +24,25 @@ function renderPipeline(){
 
     const items = clientes.filter(c => {
 
-  const estadoCliente = (c.estado || '')
-    .toString()
-    .trim()
-    .toLowerCase();
+      const estadoCliente = (c.estado || '')
+        .toString()
+        .trim()
+        .toLowerCase();
 
-  return estadoCliente === estado.toLowerCase();
+      return estadoCliente === estado.toLowerCase();
 
-});
+    });
 
-container.innerHTML = items.map(c => `
-  <div class="pipeline-card">
-    <div class="pipeline-company">${c.empresa || '-'}</div>
-    <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-  </div>
-`).join('');
+    container.innerHTML = items.map(c => `
+      <div class="pipeline-card">
+        <div class="pipeline-company">${c.empresa || '-'}</div>
+        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
+      </div>
+    `).join('');
 
   });
 
 }
-
 
 function exportBackup(){
 
@@ -1861,7 +1861,7 @@ transition:.2s;
       <thead>
         <tr>
           <th>Empresa</th><th>Tipo</th><th>País</th><th>Contacto</th>
-          <th>Estado</th><th>Prioridad</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
+          <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -2154,6 +2154,16 @@ transition:.2s;
         <input type="date" id="f-fecha">
       </div>
       <div class="form-group">
+        <label>Tipo movimiento</label>
+        <select id="f-tipo-movimiento">
+          <option>Venta</option>
+          <option>Consignación</option>
+          <option>Devolución</option>
+          <option>Muestra</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label>¿Cómo se contactó?</label>
         <select id="f-via">
           <option value="">—</option>
@@ -2229,7 +2239,7 @@ transition:.2s;
 
       <div class="form-group">
         <label>Tipo movimiento</label>
-        <select id="eh-tipo-movimiento">
+        <select id="eh-tipo">
           <option>Venta</option>
           <option>Consignación</option>
           <option>Devolución</option>
@@ -2382,6 +2392,31 @@ function updateDarkButton() {
 }
 
 
+
+function esFacturable(tipo){
+  return (tipo || 'Venta') === 'Venta';
+}
+
+function descuentaStock(tipo){
+  return ['Venta','Consignación','Muestra'].includes(tipo || 'Venta');
+}
+
+function devuelveStock(tipo){
+  return (tipo || '') === 'Devolución';
+}
+
+function calcularConsignacionesCliente(cliente){
+  let pendientes = 0;
+  (cliente.historial || []).forEach(h => {
+    if ((h.tipoMovimiento || '').trim() === 'Consignación') {
+      (h.ventas || []).forEach(v => {
+        pendientes += Number(v.cantidad || 0);
+      });
+    }
+  });
+  return pendientes;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DATA
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2454,6 +2489,20 @@ let chartEstado   = null,
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+
+function getTipoMovimientoBadge(tipo){
+
+  if(tipo === 'Consignación') return 'badge-consignacion';
+
+  if(tipo === 'Muestra') return 'badge-muestra';
+
+  if(tipo === 'Devolución') return 'badge-devolucion';
+
+  return 'badge-profit';
+
+}
+
 
 function stateBadge(estado) {
   const c = ESTADO_COLORS[estado];
@@ -2569,7 +2618,7 @@ function renderTable() {
   const tbody = document.getElementById('tbody');
 
   if (filtered.length === 0) {
-   tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
+   tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
     const overdue =
@@ -2650,6 +2699,15 @@ return `
           <td>${stateBadge(c.estado)}</td>
 
           <td>
+            ${(() => {
+              const pend = calcularConsignacionesCliente(c);
+              return pend > 0
+                ? `<span class="badge badge-consignacion">📦 ${pend} bot.</span>`
+                : `<span class="badge badge-outline" style="color:var(--text-muted)">—</span>`;
+            })()}
+          </td>
+
+          <td>
             <span class="badge ${getPrioridad(c).class}">
               ${getPrioridad(c).label}
             </span>
@@ -2693,18 +2751,17 @@ function renderStatCards() {
   const gastoPorCliente = {};
 
   ventas.forEach(v => {
-
+    // Solo contar ventas reales (cantidad positiva = venta, negativa = devolución que resta)
     if (!gastoPorCliente[v.cliente_nombre]) {
       gastoPorCliente[v.cliente_nombre] = 0;
     }
-
-    gastoPorCliente[v.cliente_nombre] +=
-      Number(v.total || 0);
-
+    gastoPorCliente[v.cliente_nombre] += Number(v.total || 0);
   });
 
+  // Filtrar clientes con total negativo o cero (solo mostrar los que tienen facturación real)
   const topClienteData =
     Object.entries(gastoPorCliente)
+      .filter(([, total]) => total > 0)
       .sort((a, b) => b[1] - a[1])[0];
 
   const topCliente =
@@ -2720,14 +2777,13 @@ const topClienteTotal =
   const ventasPorVino = {};
 
   ventas.forEach(v => {
-
+    // Solo contar botellas de ventas reales (cantidad positiva)
+    const cant = Number(v.cantidad || 0);
+    if (cant <= 0) return;
     if (!ventasPorVino[v.vino_nombre]) {
       ventasPorVino[v.vino_nombre] = 0;
     }
-
-    ventasPorVino[v.vino_nombre] +=
-      Number(v.cantidad || 0);
-
+    ventasPorVino[v.vino_nombre] += cant;
   });
 
   const topVinoData =
@@ -2744,8 +2800,7 @@ const topClienteTotal =
       ? topVinoData[1]
       : 0;
 
-  // Calcula facturación total y ganancia total
-
+  // Facturación total = suma de todos los totales (incluye negativos de devoluciones = correcto)
   const facturacionTotal = ventas.reduce((a, v) => a + Number(v.total || 0), 0);
   const gananciaTotal    = ventas.reduce((a, v) => a + calcVentaGanancia(v), 0);
 
@@ -2963,15 +3018,16 @@ function renderFinanciero() {
     const compra = vino ? Number(vino.precio_compra || 0) : 0;
     const cant   = Number(v.cantidad || 0);
     const tot    = Number(v.total || 0);
-    const costoV = compra * cant;
+    // costo siempre usa valor absoluto de cant para no restar doble en devoluciones
+    const costoV = compra * cant; // cant negativo en devolución → costo negativo → correcto
 
-    row.compras++;
-    row.botellas += cant;
+    if (cant > 0) row.compras++; // solo contar ventas reales, no devoluciones
+    row.botellas += cant;        // resta en devoluciones = correcto
     row.total    += tot;
     row.costo    += costoV;
     row.ganancia += (tot - costoV);
 
-    if (!row.ultima || v.fecha > row.ultima) row.ultima = v.fecha;
+    if (cant > 0 && (!row.ultima || v.fecha > row.ultima)) row.ultima = v.fecha;
   });
 
   // Agrega info de país desde clientes
@@ -3156,11 +3212,29 @@ if (c.logo) {
     ? `<div class="historial-list">
         ${c.historial.map(h => {
           const tieneVentas = h.ventas && h.ventas.length > 0;
-          const gananciaEntrada = tieneVentas
+          const tipoH = (h.tipoMovimiento || 'Venta').trim();
+          const esFacturableH = tipoH === 'Venta';
+          const esDev = tipoH === 'Devolución';
+
+          // Para devolución: calcular el monto usando precio_venta actual del vino
+          // (el precio guardado puede ser 0 si la consignación original no lo tenía)
+          const calcPrecioDevolucion = (vv) => {
+            const vino = vinos.find(vi => vi.id === vv.vinoId);
+            if (vino) return Number(vino.precio_venta || 0);
+            return Number(vv.precio || 0);
+          };
+
+          const totalDevolucion = esDev && tieneVentas
+            ? h.ventas.reduce((acc, vv) => acc + calcPrecioDevolucion(vv) * Number(vv.cantidad || 0), 0)
+            : 0;
+
+          const gananciaEntrada = (tieneVentas && (esFacturableH || esDev))
             ? h.ventas.reduce((acc, vv) => {
                 const vino = vinos.find(vi => vi.id === vv.vinoId);
                 const compra = vino ? Number(vino.precio_compra || 0) : 0;
-                return acc + ((Number(vv.precio || 0) - compra) * Number(vv.cantidad || 0));
+                const precioUsado = esDev ? calcPrecioDevolucion(vv) : Number(vv.precio || 0);
+                const mult = esDev ? -1 : 1;
+                return acc + mult * ((precioUsado - compra) * Number(vv.cantidad || 0));
               }, 0)
             : 0;
 
@@ -3169,16 +3243,24 @@ if (c.logo) {
               ${h.ventas.map(vv => `
                 <div class="historial-venta-row">
                   <span>${esc(vv.vinoNombre)} × ${vv.cantidad}</span>
-                  <span>€ ${Number(vv.total || 0).toFixed(2)}</span>
+                  ${esFacturableH ? `<span>€ ${Number(vv.total || 0).toFixed(2)}</span>`
+                  : esDev ? `<span style="color:#075985">€ ${calcPrecioDevolucion(vv).toFixed(2)} /u</span>`
+                  : `<span class="td-muted">sin facturar</span>`}
                 </div>
               `).join('')}
+              ${esFacturableH ? `
               <div class="historial-venta-row">
                 <span>Total venta</span>
                 <span>€ ${Number(h.total_general || 0).toFixed(2)}</span>
-              </div>
+              </div>` : ''}
+              ${esDev ? `
+              <div class="historial-venta-row" style="font-weight:700">
+                <span>💸 A devolver al cliente</span>
+                <span style="color:#991b1b;font-size:1rem">-€ ${totalDevolucion.toFixed(2)}</span>
+              </div>` : ''}
               ${gananciaEntrada !== 0 ? `
               <div class="historial-venta-row">
-                <span>Ganancia neta</span>
+                <span>${esDev ? 'Ganancia restada' : 'Ganancia neta'}</span>
                 <span class="${gananciaEntrada >= 0 ? 'profit-positive' : 'profit-negative'}">
                   ${gananciaEntrada >= 0 ? '+' : ''}€ ${gananciaEntrada.toFixed(2)}
                 </span>
@@ -3190,6 +3272,8 @@ if (c.logo) {
               <div class="historial-entry-header">
                 <span class="historial-entry-date">${esc(h.fecha)}</span>
                 <div style="display:flex;gap:.4rem;align-items:center;">
+                  ${!h.tipoMovimiento ? `<span class="badge" style="background:#fff7ed;color:#92400e;border:1px solid #fde68a" title="Tipo no definido — editá para corregir">⚠️ Sin tipo</span>` : ''}
+                  ${h.tipoMovimiento && h.tipoMovimiento !== 'Venta' ? `<span class="badge ${getTipoMovimientoBadge(h.tipoMovimiento)}">${esc(h.tipoMovimiento)}</span>` : ''}
                   <span class="badge badge-outline">${esc(h.via)}</span>
                   <button class="btn btn-ghost" style="padding:.2rem .35rem" onclick="event.stopPropagation();editHistorial('${c.id}','${h.id}')">✏️</button>
                   <button class="btn btn-ghost" style="padding:.2rem .35rem;color:#b91c1c" onclick="event.stopPropagation();deleteHistorial('${c.id}','${h.id}')">🗑️</button>
@@ -3277,6 +3361,37 @@ if (c.logo) {
       ${histHTML}
     </div>
 
+    ${(() => {
+      const consigEntradas = (c.historial || []).filter(h => (h.tipoMovimiento || '').trim() === 'Consignación' && h.ventas && h.ventas.length > 0);
+      const sinTipoConVinos = (c.historial || []).filter(h => !h.tipoMovimiento && h.ventas && h.ventas.length > 0).length;
+
+      if (consigEntradas.length === 0 && sinTipoConVinos === 0) return '';
+
+      const totalBots = consigEntradas.reduce((a, h) => a + h.ventas.reduce((b, v) => b + Number(v.cantidad || 0), 0), 0);
+
+      return `
+        <div>
+          <div class="section-title" style="color:#5b21b6">📦 Consignaciones Pendientes${totalBots > 0 ? ` (${totalBots} bot. total)` : ''}</div>
+          ${sinTipoConVinos > 0 ? `
+            <div style="background:#fff7ed;border:1px solid #fde68a;border-radius:8px;padding:.65rem .9rem;font-size:.78rem;color:#92400e;font-weight:600;margin-bottom:.5rem;">
+              ⚠️ ${sinTipoConVinos} entrada(s) sin tipo — editá con ✏️ para asignar el tipo correcto.
+            </div>` : ''}
+          ${consigEntradas.map(h => `
+            <div class="info-card" style="border-color:#c4b5fd;background:#ede9fe22;margin-bottom:.5rem;">
+              <div style="font-size:.75rem;font-weight:700;color:#5b21b6;margin-bottom:.4rem;">${esc(h.fecha)} — ${h.ventas.reduce((a,v)=>a+Number(v.cantidad||0),0)} bot. en consignación</div>
+              ${h.ventas.map(v => `
+                <div class="info-row" style="margin-bottom:.2rem;">
+                  <span class="info-row-label">${esc(v.vinoNombre)}</span>
+                  <span class="badge badge-consignacion">${v.cantidad} bot.</span>
+                </div>
+              `).join('')}
+              <div style="margin-top:.5rem;font-size:.72rem;color:#7c3aed;">Para cerrar: editá esta entrada con ✏️ y cambiá el tipo a <strong>Venta</strong>.</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    })()}
+
     <hr class="separator">
 
     <div class="new-contact-box">
@@ -3287,20 +3402,21 @@ if (c.logo) {
       <div class="form-grid-2">
         <div class="form-group">
           <label>Fecha</label>
-          <input type="date" id="nc-fecha" value="${today()}">
-        </div>
-        <div class="form-group">
-          <label>Tipo movimiento</label>
-          <select id="nc-tipo-movimiento">
-            <option>Venta</option>
-            <option>Consignación</option>
-            <option>Devolución</option>
-            <option>Muestra</option>
-          </select>
-        </div>
+        <input type="date" id="nc-fecha">
+      </div>
 
-        <div class="form-group">
-          <label>Vía</label>
+      <div class="form-group">
+        <label>Tipo movimiento</label>
+        <select id="nc-tipo-movimiento" onchange="updateTipoMovInfo()">
+          <option>Venta</option>
+          <option>Consignación</option>
+          <option>Devolución</option>
+          <option>Muestra</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Vía</label>
           <select id="nc-via">
             <option value="">Seleccione…</option>
             <option>Llamada</option><option>Email</option><option>WhatsApp</option>
@@ -3330,6 +3446,8 @@ if (c.logo) {
         <input type="text" id="grand-total" readonly>
       </div>
 
+      <div id="tipo-mov-info" style="font-size:.75rem;padding:.5rem .75rem;border-radius:8px;margin-top:.25rem;display:none;"></div>
+
       <div class="form-group">
         <label>Actualizar próximo seguimiento (opcional)</label>
         <input type="date" id="nc-proximo">
@@ -3341,19 +3459,6 @@ if (c.logo) {
   document.getElementById('sheet').classList.add('open');
   syncOverlay();
 }
-
-
-function getTipoMovimientoBadge(tipo){
-
-  if(tipo === 'Consignación') return 'badge-consignacion';
-
-  if(tipo === 'Muestra') return 'badge-muestra';
-
-  if(tipo === 'Devolución') return 'badge-devolucion';
-
-  return 'badge-profit';
-}
-
 
 function closeSheet() {
   document.getElementById('sheet').classList.remove('open');
@@ -3403,16 +3508,24 @@ async function saveNewContact() {
     if (!sheetId) return;
 
     const fecha   = document.getElementById('nc-fecha').value;
-    const tipoMovimiento = document.getElementById('nc-tipo-movimiento').value;
     const via     = document.getElementById('nc-via').value;
     const nota    = document.getElementById('nc-nota').value.trim();
     const proximo = document.getElementById('nc-proximo').value;
+    const tipoMov = document.getElementById('nc-tipo-movimiento').value || 'Venta';
 
     if (!via) { alert('Selecciona la vía de contacto.'); return; }
+    if (!fecha) { alert('Selecciona la fecha del contacto.'); return; }
 
     const wineLines = [...document.querySelectorAll('.wine-line')];
     const ventasLineas = [];
     let totalGeneral = 0;
+
+    // Para Devolución: sube stock, no requiere validación de stock disponible
+    const esDevolucion = tipoMov === 'Devolución';
+    // Para Consignación y Muestra: baja stock pero NO genera facturación/ganancia
+    const descuenta = ['Venta','Consignación','Muestra'].includes(tipoMov);
+    // Solo Venta genera facturación y ganancia
+    const esFacturable = tipoMov === 'Venta';
 
     for (const line of wineLines) {
       const vinoId   = line.querySelector('.wine-vino').value;
@@ -3420,13 +3533,15 @@ async function saveNewContact() {
       if (!vinoId || cantidad <= 0) continue;
       const vino = vinos.find(v => v.id === vinoId);
       if (!vino) continue;
-      if (cantidad > Number(vino.stock_actual || 0)) {
+
+      if (descuenta && cantidad > Number(vino.stock_actual || 0)) {
         alert(`No hay stock suficiente para ${vino.nombre}`); return;
       }
-      const precio = Number(vino.precio_venta || 0);
+
+      const precio = esFacturable ? Number(vino.precio_venta || 0) : esDevolucion ? Number(vino.precio_venta || 0) : 0;
       const total  = precio * cantidad;
       totalGeneral += total;
-      ventasLineas.push({ vinoId, vinoNombre: vino.nombre, cantidad, precio, total });
+      ventasLineas.push({ vinoId, vinoNombre: vino.nombre, cantidad, precio, total, tipoMov });
     }
 
     const userData = await supabase.auth.getUser();
@@ -3439,9 +3554,9 @@ const vendedorNombre =
 const entry = {
   id: crypto.randomUUID(),
   fecha,
-  tipoMovimiento,
   via,
   nota,
+  tipoMovimiento: tipoMov,
   ventas: ventasLineas,
   total_general: totalGeneral,
   vendedor: vendedorNombre,
@@ -3454,7 +3569,7 @@ const entry = {
     );
 
     const { error } = await supabase.from('clientes').update({
-      fecha, via, nota,
+      fecha: fecha || null, via, nota,
       proximo: proximo || clienteActual.proximo,
       historial: hist
     }).eq('id', sheetId);
@@ -3466,49 +3581,67 @@ const entry = {
       if (!vino) continue;
       const stockActual = Number(vino.stock_actual || 0);
 
-if (venta.cantidad > stockActual) {
-  alert(`Stock insuficiente para ${vino.nombre}`);
-  return;
-}
-
-let nuevoStock = stockActual;
-
-if(
-  tipoMovimiento === 'Venta' ||
-  tipoMovimiento === 'Consignación' ||
-  tipoMovimiento === 'Muestra'
-){
-  nuevoStock = stockActual - venta.cantidad;
-}
-
-if(tipoMovimiento === 'Devolución'){
-  nuevoStock = stockActual + venta.cantidad;
-}
+      let nuevoStock;
+      if (esDevolucion) {
+        // Devolución: sube stock
+        nuevoStock = stockActual + venta.cantidad;
+      } else if (descuenta) {
+        // Venta / Consignación / Muestra: baja stock
+        if (venta.cantidad > stockActual) {
+          alert(`Stock insuficiente para ${vino.nombre}`);
+          return;
+        }
+        nuevoStock = stockActual - venta.cantidad;
+      } else {
+        continue; // Sin efecto en stock
+      }
 
       const { error: stockError } = await supabase.from('vinos')
         .update({ stock_actual: nuevoStock }).eq('id', venta.vinoId);
       if (stockError) { console.error(stockError); alert('Error actualizando stock'); return; }
 
-if(tipoMovimiento === 'Venta'){
-
-     const { error: ventaError } = await supabase.from('ventas').insert([{
-  historial_id: entry.id,
-  cliente_id:      clienteActual.id,
-        vino_id:         venta.vinoId,
-        cliente_nombre:  clienteActual.empresa,
-        vino_nombre:     venta.vinoNombre,
-        cantidad:        venta.cantidad,
-        precio_unitario: venta.precio,
-        total:           venta.total,
-        fecha,
-        vendedor: vendedorNombre,
-        nota
-      }]);
-     if (ventaError) { 
-  console.error('ERROR VENTA:', ventaError);
-  alert(JSON.stringify(ventaError, null, 2));
-  return; 
-}
+      // Solo insertar en tabla ventas si es Venta (para facturación y ganancias)
+      if (esFacturable) {
+        const { error: ventaError } = await supabase.from('ventas').insert([{
+          historial_id: entry.id,
+          cliente_id:      clienteActual.id,
+          vino_id:         venta.vinoId,
+          cliente_nombre:  clienteActual.empresa,
+          vino_nombre:     venta.vinoNombre,
+          cantidad:        venta.cantidad,
+          precio_unitario: venta.precio,
+          total:           venta.total,
+          fecha:           fecha || null,
+          vendedor: vendedorNombre,
+          nota
+        }]);
+        if (ventaError) { 
+          console.error('ERROR VENTA:', ventaError);
+          alert(JSON.stringify(ventaError, null, 2));
+          return; 
+        }
+      } else if (esDevolucion) {
+        // Devolución: resta de facturación → insertar venta con total negativo
+        const { error: ventaError } = await supabase.from('ventas').insert([{
+          historial_id: entry.id,
+          cliente_id:      clienteActual.id,
+          vino_id:         venta.vinoId,
+          cliente_nombre:  clienteActual.empresa,
+          vino_nombre:     venta.vinoNombre,
+          cantidad:        -venta.cantidad,
+          precio_unitario: Number(vino.precio_venta || 0),
+          total:           -(Number(vino.precio_venta || 0) * venta.cantidad),
+          fecha:           fecha || null,
+          vendedor: vendedorNombre,
+          nota
+        }]);
+        if (ventaError) { 
+          console.error('ERROR DEVOLUCION:', ventaError);
+          alert(JSON.stringify(ventaError, null, 2));
+          return; 
+        }
+      }
+      // Consignación y Muestra: solo baja stock, NO inserta en ventas
     }
 
     await loadClientes();
@@ -3737,6 +3870,36 @@ function addWineLine() {
 function removeWineLine(btn) {
   btn.closest('.wine-line').remove();
   updateGrandTotal();
+  updateTipoMovInfo();
+}
+
+function updateTipoMovInfo() {
+  const tipoEl = document.getElementById('nc-tipo-movimiento');
+  const infoEl = document.getElementById('tipo-mov-info');
+  if (!tipoEl || !infoEl) return;
+  const tipo = tipoEl.value;
+  const map = {
+    'Venta':        { msg: '✅ Baja stock · Factura · Suma ganancia', bg:'#f0fdf4', color:'#166534' },
+    'Consignación': { msg: '📦 Baja stock · SIN factura · SIN ganancia (queda pendiente de cierre)', bg:'#ede9fe', color:'#5b21b6' },
+    'Devolución':   { msg: '↩️ Sube stock · Resta facturación · Resta ganancia', bg:'#e0f2fe', color:'#075985' },
+    'Muestra':      { msg: '🎁 Baja stock · SIN factura · SIN ganancia', bg:'#ecfccb', color:'#3f6212' },
+  };
+  const info = map[tipo];
+  if (info) {
+    infoEl.style.display = 'block';
+    infoEl.style.background = info.bg;
+    infoEl.style.color = info.color;
+    infoEl.style.fontWeight = '600';
+    infoEl.textContent = info.msg;
+  } else {
+    infoEl.style.display = 'none';
+  }
+  // Refresh all wine line calculations
+  document.querySelectorAll('.wine-line').forEach(line => {
+    const sel = line.querySelector('.wine-vino');
+    if (sel) updateWineInfo(sel);
+  });
+  updateGrandTotal();
 }
 
 function updateGrandTotal() {
@@ -3762,6 +3925,11 @@ function updateWineInfo(element) {
   const totalEl  = line.querySelector('.wine-total');
   const ganEl    = line.querySelector('.wine-ganancia');
 
+  // Detect tipo movimiento from the form
+  const tipoMovEl = document.getElementById('nc-tipo-movimiento');
+  const tipoMov   = tipoMovEl ? tipoMovEl.value : 'Venta';
+  const esFact    = tipoMov === 'Venta';
+
   if (!vinoId) {
     precioEl.value = ''; compraEl.value = ''; totalEl.value = ''; ganEl.value = '';
     updateGrandTotal(); return;
@@ -3770,14 +3938,14 @@ function updateWineInfo(element) {
   if (!vino) return;
   const precio  = Number(vino.precio_venta  || 0);
   const compra  = Number(vino.precio_compra || 0);
-  const total   = precio * cantidad;
-  const ganancia= (precio - compra) * cantidad;
+  const total   = esFact ? precio * cantidad : 0;
+  const ganancia= esFact ? (precio - compra) * cantidad : 0;
 
-  precioEl.value = `€ ${precio.toFixed(2)}`;
+  precioEl.value = esFact ? `€ ${precio.toFixed(2)}` : '—';
   compraEl.value = `€ ${compra.toFixed(2)}`;
-  totalEl.value  = `€ ${total.toFixed(2)}`;
-  ganEl.value    = `${ganancia >= 0 ? '+' : ''}€ ${ganancia.toFixed(2)}`;
-  ganEl.style.color = ganancia >= 0 ? '#166534' : '#991b1b';
+  totalEl.value  = esFact ? `€ ${total.toFixed(2)}` : '—';
+  ganEl.value    = esFact ? `${ganancia >= 0 ? '+' : ''}€ ${ganancia.toFixed(2)}` : '—';
+  ganEl.style.color = esFact && ganancia >= 0 ? '#166534' : esFact ? '#991b1b' : 'var(--text-muted)';
   updateGrandTotal();
 }
 
@@ -3969,12 +4137,12 @@ function getExportData() {
     const cpra = vino ? Number(vino.precio_compra || 0) : 0;
     const cant = Number(v.cantidad || 0);
     const tot  = Number(v.total || 0);
-    row.compras++;
+    if (cant > 0) row.compras++;
     row.botellas += cant;
     row.total    += tot;
     row.costo    += cpra * cant;
     row.ganancia += tot - cpra * cant;
-    if (!row.ultima || v.fecha > row.ultima) row.ultima = v.fecha;
+    if (cant > 0 && (!row.ultima || v.fecha > row.ultima)) row.ultima = v.fecha;
   });
   const headers = ['Cliente','Compras','Botellas','Total Gastado','Costo Total','Ganancia Neta','Última Compra'];
   const rows = Object.values(porCliente).sort((a,b) => b.total - a.total).map(r =>
@@ -4243,60 +4411,59 @@ async function saveEditedHistory() {
 
   if (!historialItem) return;
 
-  // DEVOLVER STOCK VIEJO
+  const tipoViejo  = (historialItem.tipoMovimiento || 'Venta').trim();
+  const tipoNuevo  = document.getElementById('eh-tipo').value || 'Venta';
+  const ehFecha    = document.getElementById('eh-fecha').value;
+  const ehNota     = document.getElementById('eh-nota').value;
 
-  if (historialItem.ventas) {
-
+  // ── REVERTIR EFECTO ANTERIOR EN STOCK ──────────────────────────────────────
+  // Si el tipo viejo bajaba stock → devolvemos esas unidades
+  // Si el tipo viejo era Devolución → quitamos las unidades que había sumado
+  if (historialItem.ventas && historialItem.ventas.length > 0) {
     for (const venta of historialItem.ventas) {
-
-      const vino = vinos.find(
-        v => v.id === venta.vinoId
-      );
-
-      if (vino) {
-
-        await supabase
-          .from('vinos')
-          .update({
-            stock_actual:
-              Number(vino.stock_actual || 0) +
-              Number(venta.cantidad || 0)
-          })
-          .eq('id', venta.vinoId);
+      const vino = vinos.find(v => v.id === venta.vinoId);
+      if (!vino) continue;
+      const cant = Math.abs(Number(venta.cantidad || 0));
+      let stockRevert;
+      if (tipoViejo === 'Devolución') {
+        // viejo sumaba stock → revertir: quitar
+        stockRevert = Number(vino.stock_actual || 0) - cant;
+      } else if (['Venta','Consignación','Muestra'].includes(tipoViejo)) {
+        // viejo bajaba stock → revertir: sumar
+        stockRevert = Number(vino.stock_actual || 0) + cant;
+      } else {
+        stockRevert = Number(vino.stock_actual || 0) + cant;
       }
+      await supabase.from('vinos').update({ stock_actual: stockRevert }).eq('id', venta.vinoId);
     }
   }
 
-  // BORRAR VENTAS VIEJAS
+  // ── BORRAR VENTAS VIEJAS DE LA TABLA ventas ─────────────────────────────────
+  await supabase.from('ventas').delete().eq('historial_id', historialItem.id);
+  await loadVinos();
 
-  await supabase
-  .from('ventas')
-  .delete()
-  .eq('historial_id', historialItem.id);
- await loadVinos();
-
-  // NUEVAS VENTAS
+  // ── PROCESAR NUEVAS LÍNEAS ───────────────────────────────────────────────────
+  const esFacturableNuevo = tipoNuevo === 'Venta';
+  const esDevolucionNuevo = tipoNuevo === 'Devolución';
+  const descuentaNuevo    = ['Venta','Consignación','Muestra'].includes(tipoNuevo);
 
   const nuevasVentas = [];
-
-  const lines = [
-    ...document.querySelectorAll('.edit-wine-line')
-  ];
+  const lines = [...document.querySelectorAll('.edit-wine-line')];
 
   for (const line of lines) {
-
-    const vinoId = line.querySelector('.edit-vino').value;
-
-    const cantidad = Number(
-      line.querySelector('.edit-cantidad').value || 0
-    );
-
+    const vinoId  = line.querySelector('.edit-vino').value;
+    const cantidad = Number(line.querySelector('.edit-cantidad').value || 0);
     const vino = vinos.find(v => v.id === vinoId);
-
     if (!vino || cantidad <= 0) continue;
 
-    const precio = Number(vino.precio_venta || 0);
+    const stockActual = Number(vino.stock_actual || 0);
 
+    if (descuentaNuevo && cantidad > stockActual) {
+      alert(`No hay stock suficiente para ${vino.nombre}`);
+      return;
+    }
+
+    const precio = esFacturableNuevo ? Number(vino.precio_venta || 0) : esDevolucionNuevo ? Number(vino.precio_venta || 0) : 0;
     nuevasVentas.push({
       vinoId,
       vinoNombre: vino.nombre,
@@ -4305,67 +4472,64 @@ async function saveEditedHistory() {
       total: precio * cantidad
     });
 
-    // DESCONTAR STOCK NUEVO
-
-    const stockActual = Number(vino.stock_actual || 0);
-
-if (cantidad > stockActual) {
-  alert(`No hay stock suficiente para ${vino.nombre}`);
-  return;
-}
-
-const nuevoStock = stockActual - cantidad;
-
-if (nuevoStock < 0) {
-  alert(`Stock insuficiente para ${vino.nombre}`);
-  return;
-}
-
-await supabase
-  .from('vinos')
-  .update({
-    stock_actual: nuevoStock
-  })
-  .eq('id', vinoId);
-
-    // INSERTAR NUEVA VENTA
-
-    await supabase
-  .from('ventas')
-  .insert([{
-    historial_id: historialItem.id,
-    cliente_id: cliente.id,
-        cliente_nombre: cliente.empresa,
-        vino_id: vinoId,
-        vino_nombre: vino.nombre,
-        cantidad,
-        precio_unitario: precio,
-        total: precio * cantidad,
-        fecha: document.getElementById('eh-fecha').value,
-        vendedor: historialItem.vendedor || '',
-        nota: document.getElementById('eh-nota').value
-      }]);
-  }
-
-  // ACTUALIZAR HISTORIAL
-
-  const historialActualizado = cliente.historial.map(h => {
-
-    if (String(h.id) === String(editingHistoryId)) {
-
-      return {
-        ...h,
-        fecha: document.getElementById('eh-fecha').value,
-        via: document.getElementById('eh-via').value,
-        nota: document.getElementById('eh-nota').value,
-        ventas: nuevasVentas,
-        total_general: nuevasVentas.reduce(
-          (acc, v) => acc + v.total,
-          0
-        )
-      };
+    // Aplicar efecto en stock
+    let nuevoStock;
+    if (esDevolucionNuevo) {
+      nuevoStock = stockActual + cantidad;
+    } else if (descuentaNuevo) {
+      nuevoStock = stockActual - cantidad;
+    } else {
+      nuevoStock = stockActual;
     }
 
+    await supabase.from('vinos').update({ stock_actual: nuevoStock }).eq('id', vinoId);
+
+    // Insertar en tabla ventas solo si corresponde
+    if (esFacturableNuevo) {
+      await supabase.from('ventas').insert([{
+        historial_id:    historialItem.id,
+        cliente_id:      cliente.id,
+        cliente_nombre:  cliente.empresa,
+        vino_id:         vinoId,
+        vino_nombre:     vino.nombre,
+        cantidad,
+        precio_unitario: precio,
+        total:           precio * cantidad,
+        fecha:           ehFecha,
+        vendedor:        historialItem.vendedor || '',
+        nota:            ehNota
+      }]);
+    } else if (esDevolucionNuevo) {
+      await supabase.from('ventas').insert([{
+        historial_id:    historialItem.id,
+        cliente_id:      cliente.id,
+        cliente_nombre:  cliente.empresa,
+        vino_id:         vinoId,
+        vino_nombre:     vino.nombre,
+        cantidad:        -cantidad,
+        precio_unitario: Number(vino.precio_venta || 0),
+        total:           -(Number(vino.precio_venta || 0) * cantidad),
+        fecha:           ehFecha,
+        vendedor:        historialItem.vendedor || '',
+        nota:            ehNota
+      }]);
+    }
+    // Consignación y Muestra: solo stock, sin ventas
+  }
+
+  // ── ACTUALIZAR HISTORIAL DEL CLIENTE ────────────────────────────────────────
+  const historialActualizado = cliente.historial.map(h => {
+    if (String(h.id) === String(editingHistoryId)) {
+      return {
+        ...h,
+        fecha:           ehFecha,
+        tipoMovimiento:  tipoNuevo,
+        via:             document.getElementById('eh-via').value,
+        nota:            ehNota,
+        ventas:          nuevasVentas,
+        total_general:   nuevasVentas.reduce((acc, v) => acc + v.total, 0)
+      };
+    }
     return h;
   });
 
@@ -4407,21 +4571,7 @@ window.filterPendientes = filterPendientes;
 window.openExportModal  = openExportModal;
 window.closeExportModal = closeExportModal;
 window.switchExportTab  = switchExportTab;
-
 window.doExportCSV      = doExportCSV;
-
-const oldShowPage = window.showPage;
-
-window.showPage = function(name){
-  oldShowPage(name);
-
-  if(name === 'pipeline'){
-    setTimeout(() => {
-      renderPipeline();
-    }, 300);
-  }
-};
-
 window.editFromSheet    = editFromSheet;
 window.deleteFromSheet  = deleteFromSheet;
 window.saveNewContact   = saveNewContact;
@@ -4437,6 +4587,7 @@ window.removeWineLine   = removeWineLine;
 window.closeEditHistoryModal = closeEditHistoryModal;
 window.addEditWineLine = addEditWineLine;
 window.saveEditedHistory = saveEditedHistory;
+window.updateTipoMovInfo = updateTipoMovInfo;
 
 
 window.exportBackup = exportBackup;
@@ -4463,6 +4614,7 @@ function renderPipeline(){
   });
 
 }
+
 
 
 function exportBackup(){
