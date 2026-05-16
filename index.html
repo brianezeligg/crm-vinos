@@ -43,19 +43,6 @@ container.innerHTML = items.map(c => `
 
 }
 
-const oldShowPage = showPage;
-
-showPage = function(name){
-  oldShowPage(name);
-
-  if(name === 'pipeline'){
-
-    setTimeout(() => {
-      renderPipeline();
-    }, 300);
-
-  }
-}
 
 function exportBackup(){
 
@@ -4420,7 +4407,21 @@ window.filterPendientes = filterPendientes;
 window.openExportModal  = openExportModal;
 window.closeExportModal = closeExportModal;
 window.switchExportTab  = switchExportTab;
+
 window.doExportCSV      = doExportCSV;
+
+const oldShowPage = window.showPage;
+
+window.showPage = function(name){
+  oldShowPage(name);
+
+  if(name === 'pipeline'){
+    setTimeout(() => {
+      renderPipeline();
+    }, 300);
+  }
+};
+
 window.editFromSheet    = editFromSheet;
 window.deleteFromSheet  = deleteFromSheet;
 window.saveNewContact   = saveNewContact;
@@ -4463,19 +4464,6 @@ function renderPipeline(){
 
 }
 
-const oldShowPage = showPage;
-
-showPage = function(name){
-  oldShowPage(name);
-
-  if(name === 'pipeline'){
-
-    setTimeout(() => {
-      renderPipeline();
-    }, 300);
-
-  }
-}
 
 function exportBackup(){
 
