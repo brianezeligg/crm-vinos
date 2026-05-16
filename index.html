@@ -459,56 +459,279 @@ header {
 }
 @media (max-width: 640px) {
 
+  /* ── STATS GRID ── */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
+    gap: .6rem;
   }
 
+  .stat-card { padding: .9rem 1rem; border-radius: 14px; }
+  .stat-label { font-size: .6rem; }
+  .stat-value { font-size: 1.5rem; }
+
+  /* ── TOOLBAR ── */
   .toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: .6rem;
+    padding: .9rem;
+    border-radius: 14px;
   }
-
   .toolbar-actions {
     margin-left: 0;
     width: 100%;
+    flex-wrap: wrap;
+    gap: .4rem;
   }
+  .toolbar-actions .btn { flex: 1; min-width: 0; font-size: .78rem; padding: .55rem .6rem; }
+  .toolbar-selects { flex-direction: column; gap: .4rem; }
+  .toolbar-selects select { width: 100%; }
+  .search-wrap { width: 100%; }
 
-  .toolbar-actions .btn {
-    flex: 1;
-  }
+  /* ── TABLA → CARDS en mobile ── */
+  .table-wrap { overflow: visible; border-radius: 14px; }
 
-  .toolbar-selects {
+  table, thead, tbody, tr, th, td { display: block; }
+  thead { display: none; }
+
+  tbody tr {
+    display: flex;
     flex-direction: column;
+    gap: .3rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: .6rem;
+    padding: .85rem 1rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    transition: box-shadow .15s, transform .15s;
+    position: relative;
   }
 
-  .toolbar-selects select {
+  tbody tr.overdue { border-left: 3px solid #ef4444; }
+
+  tbody tr:active { transform: scale(.99); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+  /* Ocultar columnas que no se necesitan en mobile */
+  tbody td[data-col="tipo"],
+  tbody td[data-col="pais"],
+  tbody td[data-col="comentario"] { display: none; }
+
+  tbody td { padding: 0; border: none; font-size: .85rem; }
+
+  /* Empresa — destacada */
+  tbody td[data-col="empresa"] {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+    padding-bottom: .25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: .15rem;
+  }
+
+  /* Fila de badges */
+  tbody td[data-col="estado"],
+  tbody td[data-col="consignacion"],
+  tbody td[data-col="prioridad"] {
+    display: inline-flex;
+    width: auto;
+  }
+
+  /* Contenedor de badges en una fila */
+  tbody tr .mobile-badges-row {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  tbody td[data-col="contacto"] { color: var(--text-muted); font-size: .8rem; }
+  tbody td[data-col="fecha"] { color: var(--text-muted); font-size: .75rem; }
+
+  /* Acciones al costado */
+  tbody td[data-col="acc"] {
+    position: absolute;
+    top: .85rem;
+    right: .85rem;
+    display: flex;
+    gap: .25rem;
+  }
+
+  /* ── MODAL ── */
+  .modal-box {
     width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    transform: none;
+    animation: slideUp .25s ease;
   }
 
-  .search-wrap {
-    width: 100%;
-  }
-
-  .table-wrap {
-    overflow-x: auto;
-  }
-
-  table {
-    min-width: 980px;
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
   }
 
   .modal-body {
     grid-template-columns: 1fr;
+    padding: 1rem;
+    max-height: 65vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-footer {
+    padding: 1rem;
+    gap: .5rem;
+  }
+  .modal-footer .btn { flex: 1; padding: .75rem; font-size: .9rem; }
+
+  /* ── SHEET (ficha) → pantalla completa en mobile ── */
+  .sheet {
+    width: 100% !important;
+    right: -100%;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sheet.open { right: 0; }
+
+  .sheet-header {
+    padding: .85rem 1rem;
+    flex-shrink: 0;
+  }
+
+  .sheet-body {
+    padding: 1rem;
+    gap: 1rem;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6rem; /* espacio para el footer fijo */
   }
 
   .sheet-footer {
-    flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid var(--border);
+    padding: .75rem 1rem;
+    flex-wrap: nowrap;
+    gap: .4rem;
+    z-index: 10;
+    flex-shrink: 0;
   }
 
   .sheet-footer .btn {
     flex: 1;
+    padding: .65rem .4rem;
+    font-size: .78rem;
   }
 
+  /* ── FORMULARIO NUEVO CONTACTO ── */
+  .new-contact-box { padding: .85rem; }
+  .form-grid-2 { grid-template-columns: 1fr; }
+
+  input, select, textarea {
+    font-size: 16px !important; /* evita zoom en iOS */
+    padding: .7rem .85rem;
+  }
+
+  .wine-line { padding: .65rem !important; }
+
+  /* ── HEADER/NAV ── */
+  header { padding: 0 .85rem; height: 58px; }
+  .header-brand { font-size: 1.1rem; }
+  .header-brand svg { width: 18px; height: 18px; }
+
+  .nav-tabs { gap: 2px; padding: 4px; }
+  .nav-tab { padding: 6px 10px; font-size: .72rem; }
+
+  .header-actions { gap: .35rem; }
+  .header-actions .btn { padding: .4rem .6rem; font-size: .75rem; }
+
+  /* ── INFO CARD ── */
+  .info-card { padding: .75rem; }
+  .info-row { flex-direction: column; gap: .15rem; }
+  .info-row-label { font-size: .72rem; }
+  .info-row-val { font-size: .85rem; text-align: left; }
+
+  /* ── HISTORIAL ── */
+  .historial-entry { padding: .75rem; }
+  .historial-entry-header { flex-wrap: wrap; gap: .3rem; }
+  .historial-venta-row { font-size: .78rem; }
+
+  /* ── SECCIÓN TITLE ── */
+  .section-title { font-size: .65rem; margin-bottom: .5rem; }
+
+  /* ── FINANCIERO ── */
+  .fin-table { font-size: .75rem; }
+  .fin-table thead th, .fin-table tbody td { padding: .5rem .6rem; }
+
+  /* ── CHARTS ── */
+  .charts-grid { grid-template-columns: 1fr; }
+  .chart-card { padding: .85rem; }
+
+  /* ── PAGE PADDING ── */
+  .page { padding: .85rem; gap: .85rem; }
+
+  /* ── NAV scrollable ── */
+  .nav-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: calc(100vw - 175px);
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+
+  /* ── LOGIN ── */
+  #login-screen > div { width: 100% !important; max-width: 340px; padding: 1.75rem !important; }
+
+}
+
+/* ── TABLA VINOS ── */
+#page-vinos .table-wrap { overflow-x: auto !important; }
+#page-vinos .table-wrap table { table-layout: auto; width: 100%; }
+
+/* Badges compactos en tabla */
+#table-clientes td[data-col="prioridad"] .badge,
+#table-clientes td[data-col="consignacion"] .badge {
+  font-size: .75rem;
+  padding: .25rem .55rem;
+  white-space: nowrap;
+}
+
+/* ── UTILITY ── */
+.mobile-only { display: none; }
+
+/* ── TABLE COLUMN WIDTHS (desktop) — solo tabla clientes ── */
+#table-clientes { table-layout: fixed; width: 100%; }
+#table-clientes thead th:nth-child(1)  { width: 22%; } /* Empresa */
+#table-clientes thead th:nth-child(2)  { width: 11%; } /* Tipo */
+#table-clientes thead th:nth-child(3)  { width: 11%; } /* País */
+#table-clientes thead th:nth-child(4)  { width: 12%; } /* Estado */
+#table-clientes thead th:nth-child(5)  { width: 12%; } /* Consignación */
+#table-clientes thead th:nth-child(6)  { width: 12%; } /* Prioridad */
+#table-clientes thead th:nth-child(7)  { width: 12%; } /* Último cont. */
+#table-clientes thead th:nth-child(8)  { width: 8%;  } /* Acc. */
+.td-empresa { overflow: hidden; }
+
+@media (max-width: 640px) {
+  .mobile-only { display: block; }
+  #table-clientes { table-layout: auto; }
+}
+
+/* ── DARK MODE SHEET FOOTER ── */
+body.dark .sheet-footer {
+  background: rgba(27,20,22,.98);
+  border-top: 1px solid rgba(255,255,255,.06);
 }
 
 .stat-card {
@@ -1178,7 +1401,7 @@ border:1px solid #7dd3fc;
 
 }
 .sheet.open { right: 0; }
-@media (max-width: 520px) { .sheet { width: 100%; right: -100%; } .sheet.open { right: 0; } }
+@media (max-width: 520px) { .sheet { width: 100% !important; right: -100%; } .sheet.open { right: 0; } }
 .sheet-header { padding: 1.5rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); }
 .sheet-title { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 700; color: var(--primary); margin-bottom: .6rem; }
 .sheet-badges { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -1857,11 +2080,11 @@ transition:.2s;
   </div>
 
   <div class="table-wrap">
-    <table>
+    <table id="table-clientes">
       <thead>
         <tr>
-          <th>Empresa</th><th>Tipo</th><th>País</th><th>Contacto</th>
-          <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Último cont.</th><th>Comentario</th><th>Acc.</th>
+          <th>Empresa</th><th>Tipo</th><th>País</th>
+          <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Último cont.</th><th>Acc.</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -2183,6 +2406,14 @@ transition:.2s;
       <div class="form-group full">
         <label>Notas privadas internas</label>
         <textarea id="f-private-notes" rows="3" placeholder="Notas internas comerciales..."></textarea>
+      </div>
+
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.25rem;">
+        <label style="font-weight:700;color:var(--primary)">🏦 Datos Bancarios</label>
+      </div>
+      <div class="form-group full">
+        <label>IBAN / CBU</label>
+        <input type="text" id="f-iban" placeholder="Ej: LU28 0019 4006 4475 0000">
       </div>
     </div>
     <div class="modal-footer">
@@ -2618,7 +2849,7 @@ function renderTable() {
   const tbody = document.getElementById('tbody');
 
   if (filtered.length === 0) {
-   tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
+   tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${clientes.length === 0 ? 'No hay clientes. ¡Agrega el primero!' : 'No se encontraron clientes con esos filtros.'}</div></td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(c => {
     const overdue =
@@ -2636,7 +2867,7 @@ return `
     class="${rowClass}"
     onclick="openSheet('${c.id}')"
   >
-          <td class="td-empresa">
+          <td data-col="empresa" class="td-empresa">
 
   <div
     style="
@@ -2682,23 +2913,20 @@ return `
     }
 
     <div>
-      ${esc(c.empresa)}
+      <div style="font-weight:600">${esc(c.empresa)}</div>
+      <div class="mobile-only" style="font-size:.75rem;color:var(--text-muted)">${esc(c.tipo||'')}${c.tipo && c.pais ? ' · ' : ''}${esc(c.pais||'')}</div>
     </div>
 
   </div>
 
 </td>
 
-          <td class="td-muted">${esc(c.tipo)}</td>
-          <td class="td-muted">${esc(c.pais)}</td>
-        <td>
-            <div>${esc(c.contacto || '—')}</div>
-            <div class="td-hover-info">${esc(c.email || '')}${c.email && c.telefono ? ' · ' : ''}${esc(c.telefono || '')}</div>
-          </td>
+          <td data-col="tipo" class="td-muted">${esc(c.tipo)}</td>
+          <td data-col="pais" class="td-muted">${esc(c.pais)}</td>
 
-          <td>${stateBadge(c.estado)}</td>
+          <td data-col="estado">${stateBadge(c.estado)}</td>
 
-          <td>
+          <td data-col="consignacion">
             ${(() => {
               const pend = calcularConsignacionesCliente(c);
               return pend > 0
@@ -2707,16 +2935,15 @@ return `
             })()}
           </td>
 
-          <td>
+          <td data-col="prioridad">
             <span class="badge ${getPrioridad(c).class}">
               ${getPrioridad(c).label}
             </span>
           </td>
 
-          <td class="td-muted">${esc(c.fecha || '—')}</td>
+          <td data-col="fecha" class="td-muted">${esc(c.fecha || '—')}</td>
 
-          <td class="td-note" title="${esc(c.nota)}">${esc((c.nota || '').substring(0, 80))}${(c.nota || '').length > 80 ? '…' : ''}</td>
-          <td class="td-actions">
+          <td data-col="acc" class="td-actions">
             <button class="btn btn-ghost" onclick="event.stopPropagation();openModal('${c.id}')" title="Editar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
@@ -2982,9 +3209,13 @@ function renderVinos() {
         <td>${margenHTML}</td>
         <td>${stock}</td>
         <td>${stockBadge}</td>
-        <td style="display:flex;gap:.4rem;">
-          <button class="btn btn-ghost" onclick="openWineModal('${v.id}')">Editar</button>
-          <button class="btn btn-ghost" style="color:#b91c1c" onclick="deleteWine('${v.id}')">Eliminar</button>
+        <td class="td-actions">
+          <button class="btn btn-ghost" onclick="openWineModal('${v.id}')" title="Editar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn btn-ghost" style="color:#b91c1c" onclick="deleteWine('${v.id}')" title="Eliminar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          </button>
         </td>
       </tr>
     `;
@@ -3103,6 +3334,8 @@ document.getElementById('f-logo').value = c.logo || '';
   document.getElementById('f-via').value       = c.via       || '';
   document.getElementById('f-proximo').value   = c.proximo   || '';
   document.getElementById('f-nota').value      = c.nota      || '';
+  document.getElementById('f-private-notes') && (document.getElementById('f-private-notes').value = c.private_notes || '');
+  document.getElementById('f-iban').value      = c.iban      || '';
   document.getElementById('modal').classList.add('open');
   syncOverlay();
 }
@@ -3143,6 +3376,8 @@ async function saveCliente() {
     via:       document.getElementById('f-via').value,
     proximo:   document.getElementById('f-proximo').value,
     nota:      document.getElementById('f-nota').value.trim(),
+    private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
+    iban:      document.getElementById('f-iban').value.trim(),
   };
 
   let error;
@@ -3338,6 +3573,49 @@ if (c.logo) {
       </div>
     </div>
 
+    <!-- RESUMEN RÁPIDO -->
+    <div class="info-card" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;text-align:center;padding:.75rem">
+      ${(() => {
+        const totalFact = (() => {
+          let t = 0;
+          (c.historial || []).forEach(h => {
+            if ((h.tipoMovimiento||'Venta') === 'Venta') t += Number(h.total_general||0);
+            if ((h.tipoMovimiento||'') === 'Devolución') t += Number(h.total_general||0);
+          });
+          return t;
+        })();
+        const totalBots = (() => {
+          let b = 0;
+          (c.historial || []).forEach(h => {
+            const tipo = h.tipoMovimiento || '';
+            if (tipo === 'Venta') (h.ventas||[]).forEach(v => b += Number(v.cantidad||0));
+            if (tipo === 'Devolución') (h.ventas||[]).forEach(v => b -= Number(v.cantidad||0));
+          });
+          return Math.max(0, b);
+        })();
+        const consigPend = calcularConsignacionesCliente(c);
+        return `
+          <div>
+            <div style="font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Facturado</div>
+            <div style="font-size:1.1rem;font-weight:700;color:var(--primary)">€ ${totalFact.toFixed(0)}</div>
+          </div>
+          <div>
+            <div style="font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Botellas</div>
+            <div style="font-size:1.1rem;font-weight:700">${totalBots}</div>
+          </div>
+          <div>
+            <div style="font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Consignación</div>
+            <div style="font-size:1.1rem;font-weight:700;color:${consigPend>0?'#5b21b6':'var(--text-muted)'}">${consigPend > 0 ? consigPend+' bot.' : '—'}</div>
+          </div>
+        `;
+      })()}
+    </div>
+
+    ${isOverdue ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.65rem .9rem;font-size:.8rem;color:#991b1b;font-weight:600;">
+      ⏰ Seguimiento vencido desde ${esc(c.proximo)} — acordate de contactar a este cliente.
+    </div>` : ''}
+
     <div>
       <div class="section-title">Estado de Seguimiento</div>
       <div class="info-card">
@@ -3393,6 +3671,24 @@ if (c.logo) {
     })()}
 
     <hr class="separator">
+
+    <!-- DATOS BANCARIOS -->
+    ${c.iban ? `
+    <div>
+      <div class="section-title" style="color:#1e40af">🏦 Datos Bancarios</div>
+      <div class="info-card" style="border-color:#bfdbfe;background:#eff6ff22;">
+        <div class="info-row">
+          <span class="info-row-label">IBAN / CBU</span>
+          <span class="info-row-val" style="font-family:monospace;font-size:.9rem;letter-spacing:.04em;cursor:pointer;user-select:all" title="Click para copiar" onclick="navigator.clipboard.writeText('${esc(c.iban)}').then(()=>alert('IBAN copiado ✓'))">${esc(c.iban)} 📋</span>
+        </div>
+      </div>
+    </div>` : `
+    <div>
+      <div class="section-title" style="color:#94a3b8">🏦 Datos Bancarios</div>
+      <div style="font-size:.8rem;color:var(--text-muted);padding:.5rem 0;">
+        Sin datos bancarios — agregá el IBAN desde <strong>Editar Cliente</strong>.
+      </div>
+    </div>`}
 
     <div class="new-contact-box">
       <div class="new-contact-title">
@@ -3558,7 +3854,7 @@ const entry = {
   nota,
   tipoMovimiento: tipoMov,
   ventas: ventasLineas,
-  total_general: totalGeneral,
+  total_general: esDevolucion ? -totalGeneral : totalGeneral,
   vendedor: vendedorNombre,
   timestamp: new Date().toISOString()
 };
@@ -3742,75 +4038,68 @@ async function deleteHistorial(clienteId, historialId) {
   if (!confirm('¿Eliminar este contacto del historial?')) return;
 
   const cliente = clientes.find(c => c.id === clienteId);
-
   if (!cliente) return;
 
   const historialItem = cliente.historial.find(
     h => String(h.id) === String(historialId)
   );
-
   if (!historialItem) return;
 
-  // ─────────────────────────────────────
-  // DEVOLVER STOCK
-  // ─────────────────────────────────────
+  const tipoItem = (historialItem.tipoMovimiento || '').trim();
 
+  // ── REVERTIR STOCK ──────────────────────────────────────────────────────────
   if (historialItem.ventas && historialItem.ventas.length > 0) {
-
     for (const venta of historialItem.ventas) {
-
       const vino = vinos.find(v => v.id === venta.vinoId);
+      if (!vino) continue;
 
-      if (vino) {
+      const cant = Math.abs(Number(venta.cantidad || 0));
+      let nuevoStock;
 
-        const nuevoStock =
-          Number(vino.stock_actual || 0) +
-          Number(venta.cantidad || 0);
-
-        const { error: stockError } = await supabase
-          .from('vinos')
-          .update({
-            stock_actual: nuevoStock
-          })
-          .eq('id', venta.vinoId);
-
-        if (stockError) {
-          console.error(stockError);
-          alert('Error devolviendo stock');
-          return;
-        }
+      if (tipoItem === 'Devolución') {
+        // La entrada había sumado stock → al borrarla, restamos
+        nuevoStock = Number(vino.stock_actual || 0) - cant;
+      } else if (['Venta','Consignación','Muestra'].includes(tipoItem)) {
+        // La entrada había bajado stock → al borrarla, sumamos
+        nuevoStock = Number(vino.stock_actual || 0) + cant;
+      } else {
+        // Sin tipo definido: asumir que bajó stock (más seguro)
+        nuevoStock = Number(vino.stock_actual || 0) + cant;
       }
 
-      // ─────────────────────────────────────
-      // BORRAR VENTAS
-      // ─────────────────────────────────────
+      const { error: stockError } = await supabase
+        .from('vinos')
+        .update({ stock_actual: Math.max(0, nuevoStock) })
+        .eq('id', venta.vinoId);
 
-     const { error: ventaError } = await supabase
-  .from('ventas')
-  .delete()
-  .eq('historial_id', historialItem.id);
-
-      if (ventaError) {
-        console.error(ventaError);
-        alert('Error eliminando ventas');
+      if (stockError) {
+        console.error(stockError);
+        alert('Error devolviendo stock');
         return;
       }
     }
   }
 
-  // ─────────────────────────────────────
-  // BORRAR HISTORIAL
-  // ─────────────────────────────────────
+  // ── BORRAR VENTAS (una sola vez, por historial_id) ──────────────────────────
+  const { error: ventaError } = await supabase
+    .from('ventas')
+    .delete()
+    .eq('historial_id', historialItem.id);
 
+  if (ventaError) {
+    console.error(ventaError);
+    alert('Error eliminando ventas');
+    return;
+  }
+
+  // ── BORRAR DEL HISTORIAL DEL CLIENTE ───────────────────────────────────────
   const nuevoHistorial = cliente.historial.filter(
     h => String(h.id) !== String(historialId)
   );
 
   const { error } = await supabase
     .from('clientes')
-    .update({
-      historial: nuevoHistorial
-    })
+    .update({ historial: nuevoHistorial })
     .eq('id', clienteId);
 
   if (error) {
@@ -3903,16 +4192,28 @@ function updateTipoMovInfo() {
 }
 
 function updateGrandTotal() {
-  let total    = 0;
-  let ganancia = 0;
+  const tipoMov = document.getElementById('nc-tipo-movimiento')?.value || 'Venta';
+  const esDev   = tipoMov === 'Devolución';
+  const esFact  = tipoMov === 'Venta';
+
+  let total = 0;
   document.querySelectorAll('.wine-line').forEach(line => {
-    const tot = Number((line.querySelector('.wine-total').value || '').replace('€','').trim()) || 0;
-    const gan = Number((line.querySelector('.wine-ganancia').value || '').replace('€','').replace('+','').trim()) || 0;
-    total    += tot;
-    ganancia += gan;
+    const tot = Number((line.querySelector('.wine-total').value || '').replace('€','').replace('—','').trim()) || 0;
+    total += tot;
   });
+
   const grand = document.getElementById('grand-total');
-  if (grand) grand.value = `€ ${total.toFixed(2)}`;
+  if (!grand) return;
+  if (!esFact && !esDev) {
+    grand.value = '—';
+    grand.style.color = 'var(--text-muted)';
+  } else if (esDev) {
+    grand.value = `-€ ${total.toFixed(2)}`;
+    grand.style.color = '#991b1b';
+  } else {
+    grand.value = `€ ${total.toFixed(2)}`;
+    grand.style.color = '';
+  }
 }
 
 function updateWineInfo(element) {
@@ -4411,10 +4712,12 @@ async function saveEditedHistory() {
 
   if (!historialItem) return;
 
-  const tipoViejo  = (historialItem.tipoMovimiento || 'Venta').trim();
+  const tipoViejo  = (historialItem.tipoMovimiento || '').trim();
   const tipoNuevo  = document.getElementById('eh-tipo').value || 'Venta';
   const ehFecha    = document.getElementById('eh-fecha').value;
   const ehNota     = document.getElementById('eh-nota').value;
+
+  if (!ehFecha) { alert('Seleccioná la fecha del contacto.'); return; }
 
   // ── REVERTIR EFECTO ANTERIOR EN STOCK ──────────────────────────────────────
   // Si el tipo viejo bajaba stock → devolvemos esas unidades
@@ -4428,13 +4731,13 @@ async function saveEditedHistory() {
       if (tipoViejo === 'Devolución') {
         // viejo sumaba stock → revertir: quitar
         stockRevert = Number(vino.stock_actual || 0) - cant;
-      } else if (['Venta','Consignación','Muestra'].includes(tipoViejo)) {
-        // viejo bajaba stock → revertir: sumar
+      } else if (['Venta','Consignación','Muestra'].includes(tipoViejo) || tipoViejo === '') {
+        // viejo bajaba stock (o sin tipo: asumir bajó stock) → revertir: sumar
         stockRevert = Number(vino.stock_actual || 0) + cant;
       } else {
         stockRevert = Number(vino.stock_actual || 0) + cant;
       }
-      await supabase.from('vinos').update({ stock_actual: stockRevert }).eq('id', venta.vinoId);
+      await supabase.from('vinos').update({ stock_actual: Math.max(0, stockRevert) }).eq('id', venta.vinoId);
     }
   }
 
@@ -4527,7 +4830,9 @@ async function saveEditedHistory() {
         via:             document.getElementById('eh-via').value,
         nota:            ehNota,
         ventas:          nuevasVentas,
-        total_general:   nuevasVentas.reduce((acc, v) => acc + v.total, 0)
+        total_general:   esDevolucionNuevo
+          ? -nuevasVentas.reduce((acc, v) => acc + v.total, 0)
+          : nuevasVentas.reduce((acc, v) => acc + v.total, 0)
       };
     }
     return h;
