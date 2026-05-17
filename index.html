@@ -8,7 +8,97 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+<script>
 
+window.exportBackup = exportBackup;
+
+function renderPipeline(){
+
+  const estados = ['Nuevo','Contactado','Interesado','Cerrado'];
+
+  estados.forEach(estado=>{
+
+    const container = document.getElementById('pipe-' + estado);
+
+    if(!container) return;
+
+    const items = clientes.filter(c => {
+      const estadoCliente = (c.estado || '').toString().trim().toLowerCase();
+      return estadoCliente === estado.toLowerCase();
+    });
+
+    container.innerHTML = items.map(c => {
+      const totalFact = ventas
+        .filter(v => v.cliente_id === c.id && Number(v.cantidad||0) > 0)
+        .reduce((a, v) => a + Number(v.total||0), 0);
+      const consig = calcularConsignacionesCliente(c);
+      return `
+        <div class="pipeline-card" onclick="openSheet('${c.id}')" style="cursor:pointer">
+          <div class="pipeline-company">${esc(c.empresa || '-')}</div>
+          <div class="pipeline-meta">${esc(c.pais || '-')}${c.contacto ? ' · ' + esc(c.contacto) : ''}</div>
+          <div style="display:flex;gap:.4rem;margin-top:.4rem;flex-wrap:wrap;align-items:center;">
+            ${totalFact > 0 ? `<span class="badge badge-outline" style="font-size:.68rem">💰 €${Math.round(totalFact)}</span>` : ''}
+            ${consig > 0 ? `<span class="badge badge-consignacion" style="font-size:.68rem">📦 ${consig} bot.</span>` : ''}
+            ${c.fecha ? `<span style="font-size:.68rem;color:var(--text-muted)">${esc(c.fecha)}</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  });
+
+}
+
+function exportBackup(){
+
+  const data = {
+    clientes,
+    vinos,
+    ventas,
+    exportado: new Date().toISOString()
+  };
+
+  const blob = new Blob(
+    [JSON.stringify(data,null,2)],
+    { type:'application/json' }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'crm-backup.json';
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+}
+
+document.addEventListener('change', async (e)=>{
+
+  if(e.target.id !== 'import-backup') return;
+
+  const file = e.target.files[0];
+  if(!file) return;
+
+  try{
+
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    alert('Backup leído correctamente.');
+
+    console.log(data);
+
+  }catch(err){
+
+    alert('Error importando backup');
+
+  }
+
+});
+
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -203,9 +293,7 @@ body.dark textarea:focus {
 
   background: rgba(255,255,255,.05);
 
-}
-
-body.dark input,
+}body.dark input,
 body.dark select,
 body.dark textarea {
 
@@ -613,10 +701,7 @@ header {
 
 }
 
-@media (min-width: 900px) {
-  #auto-backup-label { display: inline !important; }
-}
-
+/* ── TABLA VINOS ── */
 #page-vinos .table-wrap { overflow-x: auto !important; }
 #page-vinos .table-wrap table { table-layout: auto; width: 100%; }
 
@@ -862,17 +947,18 @@ textarea {
   color: var(--text);
 
   background:
-    linear-gradient(
-      180deg,
-      rgba(255,255,255,.88),
-      rgba(255,255,255,.72)
-    );
+  linear-gradient(
+    180deg,
+    rgba(255,255,255,.88),
+    rgba(255,255,255,.72)
+  );
 
-  backdrop-filter: blur(8px);
+backdrop-filter: blur(8px);
 
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.5),
-    0 1px 2px rgba(0,0,0,.03);
+box-shadow:
+  inset 0 1px 0 rgba(255,255,255,.5),
+  0 1px 2px rgba(0,0,0,.03);
+
 
   outline: none;
 
@@ -881,6 +967,9 @@ textarea {
     box-shadow .18s,
     transform .12s,
     background .18s;
+
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.03);
 
 }
 
@@ -1981,11 +2070,9 @@ transition:.2s;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Exportar
       </button>
-      <button class="btn btn-outline" onclick="exportBackup()" title="Descargar backup manual ahora">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <button class="btn btn-outline" onclick="exportBackup()">
         Backup
       </button>
-      <span id="auto-backup-label" style="font-size:.72rem;color:var(--text-muted);align-self:center;white-space:nowrap;display:none"></span>
       <button class="btn btn-outline" onclick="document.getElementById('import-backup').click()">
         Importar
       </button>
@@ -2041,6 +2128,7 @@ transition:.2s;
           <th>P. Venta</th>
           <th>Margen</th>
           <th>Stock</th>
+          <th>Vendidas</th>
           <th>Estado Stock</th>
           <th>Acciones</th>
         </tr>
@@ -2210,6 +2298,15 @@ transition:.2s;
   <button
     class="btn btn-outline"
     style="flex:1"
+    onclick="marcarContactadoHoy()"
+    title="Marcar que lo contactaste hoy sin abrir el formulario"
+  >
+    ✓ Hoy
+  </button>
+
+  <button
+    class="btn btn-outline"
+    style="flex:1"
     onclick="editFromSheet()"
   >
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2293,24 +2390,6 @@ transition:.2s;
       <div class="form-group">
         <label>Último contacto</label>
         <input type="date" id="f-fecha">
-      </div>
-      <div class="form-group">
-        <label>Tipo movimiento</label>
-        <select id="f-tipo-movimiento">
-          <option>Venta</option>
-          <option>Consignación</option>
-          <option>Devolución</option>
-          <option>Muestra</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>¿Cómo se contactó?</label>
-        <select id="f-via">
-          <option value="">—</option>
-          <option>Llamada</option><option>Email</option><option>WhatsApp</option>
-          <option>Visita</option><option>LinkedIn</option>
-        </select>
       </div>
       <div class="form-group">
         <label>Próximo seguimiento</label>
@@ -2474,7 +2553,6 @@ if (userBox) {
     await loadClientes();
     await loadVinos();
     await loadVentas();
-    scheduleAutoBackup();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -2594,6 +2672,60 @@ async function loadVentas() {
     .order('fecha', { ascending: false });
   if (error) { console.error('Error cargando ventas:', error); return; }
   ventas = data || [];
+
+  // Si ventas está vacía pero hay historial, reconstruir automáticamente
+  if (ventas.length === 0 && clientes.length > 0) {
+    await sincronizarVentasDesdeHistorial();
+  }
+}
+
+async function sincronizarVentasDesdeHistorial() {
+  console.log('Sincronizando tabla ventas desde historial...');
+  const rows = [];
+
+  for (const c of clientes) {
+    for (const h of (c.historial || [])) {
+      const tipo = (h.tipoMovimiento || '').trim();
+      if (tipo !== 'Venta' && tipo !== 'Devolución') continue;
+      if (!h.ventas || h.ventas.length === 0) continue;
+
+      for (const v of h.ventas) {
+        const vino = vinos.find(vi => vi.id === v.vinoId);
+        const compra = vino ? Number(vino.precio_venta || 0) : 0;
+        const cant   = tipo === 'Devolución' ? -Math.abs(Number(v.cantidad || 0)) : Number(v.cantidad || 0);
+        const precio = Number(v.precio || compra || 0);
+        const total  = precio * cant;
+
+        rows.push({
+          historial_id:    h.id,
+          cliente_id:      c.id,
+          cliente_nombre:  c.empresa,
+          vino_id:         v.vinoId || null,
+          vino_nombre:     v.vinoNombre || '',
+          cantidad:        cant,
+          precio_unitario: Math.abs(precio),
+          total,
+          fecha:           h.fecha || null,
+          vendedor:        h.vendedor || '',
+          nota:            h.nota || ''
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  // Insertar en lotes de 50
+  for (let i = 0; i < rows.length; i += 50) {
+    const batch = rows.slice(i, i + 50);
+    const { error } = await supabase.from('ventas').insert(batch);
+    if (error) { console.error('Error sincronizando ventas:', error); }
+  }
+
+  // Recargar ventas
+  const { data } = await supabase.from('ventas').select('*').order('fecha', { ascending: false });
+  ventas = data || [];
+  console.log(`Sincronización completada: ${rows.length} registros reconstruidos.`);
 }
 
 async function loadClientes() {
@@ -2690,10 +2822,9 @@ function getPrioridad(cliente) {
 }
 
 function pendingClientes() {
-  const todayStr = today();
   return clientes.filter(c =>
     c.proximo &&
-    c.proximo <= todayStr &&
+    new Date(c.proximo).toDateString() === new Date().toDateString() &&
     c.estado !== 'Cerrado' &&
     c.estado !== 'No interesa'
   );
@@ -2728,66 +2859,8 @@ function calcVentaGanancia(ventaRow) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AUTO BACKUP DIARIO
+// NAVIGATION
 // ══════════════════════════════════════════════════════════════════════════════
-const AUTO_BACKUP_KEY = 'crm_last_auto_backup';
-const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas
-
-function scheduleAutoBackup() {
-  runAutoBackupIfNeeded();
-  updateAutoBackupLabel();
-  // Revisar cada hora si ya pasaron 24h
-  setInterval(runAutoBackupIfNeeded, 60 * 60 * 1000);
-}
-
-function runAutoBackupIfNeeded() {
-  const lastBackup = localStorage.getItem(AUTO_BACKUP_KEY);
-  const now = Date.now();
-  if (lastBackup && now - Number(lastBackup) < AUTO_BACKUP_INTERVAL_MS) {
-    updateAutoBackupLabel();
-    return;
-  }
-  // Solo hacer backup si hay datos
-  if (!clientes.length && !vinos.length) return;
-  doAutoBackup();
-}
-
-function doAutoBackup() {
-  try {
-    const data = {
-      clientes,
-      vinos,
-      ventas,
-      exportado: new Date().toISOString(),
-      tipo: 'auto'
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const fecha = new Date().toISOString().split('T')[0];
-    a.download = `crm-backup-auto-${fecha}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    localStorage.setItem(AUTO_BACKUP_KEY, String(Date.now()));
-    updateAutoBackupLabel();
-  } catch(e) {
-    console.error('Error en backup automático:', e);
-  }
-}
-
-function updateAutoBackupLabel() {
-  const el = document.getElementById('auto-backup-label');
-  if (!el) return;
-  const lastBackup = localStorage.getItem(AUTO_BACKUP_KEY);
-  if (!lastBackup) { el.textContent = 'Sin backup automático'; return; }
-  const d = new Date(Number(lastBackup));
-  el.textContent = `Último backup: ${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
-}
-
-window.doAutoBackup = doAutoBackup;
-
-
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -2818,13 +2891,19 @@ function renderTable() {
   const filtered = clientes.filter(c => {
     const empresa  = (c.empresa  || '').toLowerCase();
     const contacto = (c.contacto || '').toLowerCase();
-    const tipo     = (c.tipo     || '').toLowerCase();
-    const pais     = (c.pais     || '').toLowerCase();
-    const nota     = (c.nota     || '').toLowerCase();
-    const matchQ = !q || empresa.includes(q) || contacto.includes(q) || tipo.includes(q) || pais.includes(q) || nota.includes(q);
+    const email    = (c.email    || '').toLowerCase();
+    const telefono = (c.telefono || '').toLowerCase();
+    const matchQ = !q || empresa.includes(q) || contacto.includes(q) || email.includes(q) || telefono.includes(q);
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
     return matchQ && matchE && matchP;
+  }).sort((a, b) => {
+    // Overdue primero, luego por fecha desc
+    const aOver = a.proximo && a.proximo <= today() && a.estado !== 'Cerrado';
+    const bOver = b.proximo && b.proximo <= today() && b.estado !== 'Cerrado';
+    if (aOver && !bOver) return -1;
+    if (!aOver && bOver) return 1;
+    return (b.fecha || '').localeCompare(a.fecha || '');
   });
 
   const tbody = document.getElementById('tbody');
@@ -3079,10 +3158,26 @@ const topClienteTotal =
 
   {
     label: 'Botellas Vendidas',
-    num: topVinoCantidad,
+    num: Object.values(ventasPorVino).reduce((a,b) => a+b, 0),
     hl: false,
     icon: '📦',
     class: ''
+  },
+
+  {
+    label: 'Facturación Total',
+    num: '€ ' + Math.round(facturacionTotal),
+    hl: false,
+    icon: '💵',
+    class: ''
+  },
+
+  {
+    label: 'Ganancia Neta Total',
+    num: '€ ' + Math.round(gananciaTotal),
+    hl: gananciaTotal > 0,
+    icon: '📊',
+    class: gananciaTotal > 0 ? 'positive' : ''
   },
 
   ];
@@ -3169,6 +3264,8 @@ function renderVinos() {
     const margen   = calcMargen(v);
     const stock    = Number(v.stock_actual || 0);
     const isLow    = stock <= threshold;
+    const botVendidas = ventas.filter(ve => ve.vino_id === v.id && Number(ve.cantidad||0) > 0)
+                              .reduce((a, ve) => a + Number(ve.cantidad||0), 0);
 
     const margenHTML = margen
       ? `<span class="badge ${margen.bruto >= 0 ? 'badge-profit' : 'badge-loss'}">
@@ -3189,6 +3286,7 @@ function renderVinos() {
         <td>€ ${Number(v.precio_venta || 0).toFixed(2)}</td>
         <td>${margenHTML}</td>
         <td>${stock}</td>
+        <td><span class="td-muted">${botVendidas > 0 ? botVendidas + ' bot.' : '—'}</span></td>
         <td>${stockBadge}</td>
         <td class="td-actions">
           <button class="btn btn-ghost" onclick="openWineModal('${v.id}')" title="Editar">
@@ -3292,7 +3390,18 @@ function renderFinanciero() {
         <td class="td-muted">${esc(r.ultima || '—')}</td>
       </tr>
     `;
-  }).join('');
+  }).join('') + `
+    <tr style="font-weight:700;border-top:2px solid var(--border);background:rgba(123,31,58,.04)">
+      <td>TOTAL</td>
+      <td></td>
+      <td style="text-align:center">${filtradas.reduce((a,r)=>a+r.compras,0)}</td>
+      <td style="text-align:center">${filtradas.reduce((a,r)=>a+r.botellas,0)}</td>
+      <td>€ ${filtradas.reduce((a,r)=>a+r.total,0).toFixed(2)}</td>
+      <td class="td-muted">€ ${filtradas.reduce((a,r)=>a+r.costo,0).toFixed(2)}</td>
+      <td class="${filtradas.reduce((a,r)=>a+r.ganancia,0) >= 0 ? 'profit-positive':'profit-negative'}">€ ${filtradas.reduce((a,r)=>a+r.ganancia,0).toFixed(2)}</td>
+      <td></td>
+    </tr>
+  `;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3312,7 +3421,6 @@ function openModal(id) {
 document.getElementById('f-logo').value = c.logo || '';
   document.getElementById('f-estado').value    = c.estado    || '';
   document.getElementById('f-fecha').value     = c.fecha     || '';
-  document.getElementById('f-via').value       = c.via       || '';
   document.getElementById('f-proximo').value   = c.proximo   || '';
   document.getElementById('f-nota').value      = c.nota      || '';
   document.getElementById('f-private-notes') && (document.getElementById('f-private-notes').value = c.private_notes || '');
@@ -3354,7 +3462,6 @@ async function saveCliente() {
     logo: document.getElementById('f-logo').value.trim(),
     estado:    document.getElementById('f-estado').value,
     fecha:     document.getElementById('f-fecha').value,
-    via:       document.getElementById('f-via').value,
     proximo:   document.getElementById('f-proximo').value,
     nota:      document.getElementById('f-nota').value.trim(),
     private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
@@ -3592,6 +3699,15 @@ if (c.logo) {
       })()}
     </div>
 
+    <!-- CONTACTO RÁPIDO -->
+    ${(c.contacto || c.email || c.telefono) ? `
+    <div class="info-card" style="padding:.75rem .9rem;">
+      ${c.contacto ? `<div class="info-row"><span class="info-row-label">👤 Contacto</span><span class="info-row-val" style="font-weight:600">${esc(c.contacto)}</span></div>` : ''}
+      ${c.email ? `<div class="info-row"><span class="info-row-label">✉️ Email</span><a href="mailto:${esc(c.email)}" style="color:var(--primary);font-size:.85rem">${esc(c.email)}</a></div>` : ''}
+      ${c.telefono ? `<div class="info-row"><span class="info-row-label">📞 Teléfono</span><a href="tel:${esc(c.telefono)}" style="color:var(--primary);font-size:.85rem">${esc(c.telefono)}</a></div>` : ''}
+      ${c.direccion ? `<div class="info-row"><span class="info-row-label">📍 Dirección</span><span class="info-row-val td-muted">${esc(c.direccion)}</span></div>` : ''}
+    </div>` : ''}
+
     ${isOverdue ? `
     <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.65rem .9rem;font-size:.8rem;color:#991b1b;font-weight:600;">
       ⏰ Seguimiento vencido desde ${esc(c.proximo)} — acordate de contactar a este cliente.
@@ -3772,6 +3888,17 @@ function openWhatsApp() {
 
 function editFromSheet()   { if (sheetId) openModal(sheetId); }
 function deleteFromSheet() { if (sheetId) deleteCliente(sheetId); }
+
+async function marcarContactadoHoy() {
+  if (!sheetId) return;
+  const hoy = today();
+  const { error } = await supabase.from('clientes')
+    .update({ fecha: hoy })
+    .eq('id', sheetId);
+  if (error) { console.error(error); alert('Error actualizando fecha'); return; }
+  await loadClientes();
+  openSheet(sheetId);
+}
 
 let savingContact = false;
 
@@ -4874,10 +5001,11 @@ window.closeEditHistoryModal = closeEditHistoryModal;
 window.addEditWineLine = addEditWineLine;
 window.saveEditedHistory = saveEditedHistory;
 window.updateTipoMovInfo = updateTipoMovInfo;
+window.sincronizarVentasDesdeHistorial = sincronizarVentasDesdeHistorial;
+window.marcarContactadoHoy = marcarContactadoHoy;
 
 
 window.exportBackup = exportBackup;
-window.renderPipeline = renderPipeline;
 
 function renderPipeline(){
 
@@ -4885,25 +5013,8 @@ function renderPipeline(){
 
   estados.forEach(estado=>{
 
-    const container = document.getElementById('pipe-' + estado);
 
-    if(!container) return;
 
-    const items = clientes.filter(c => {
-      const estadoCliente = (c.estado || '').toString().trim().toLowerCase();
-      return estadoCliente === estado.toLowerCase();
-    });
-
-    container.innerHTML = items.map(c => `
-      <div class="pipeline-card">
-        <div class="pipeline-company">${c.empresa || '-'}</div>
-        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-      </div>
-    `).join('');
-
-  });
-
-}
 
 function exportBackup(){
 
@@ -4942,19 +5053,13 @@ document.addEventListener('change', async (e)=>{
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (!data.clientes || !data.vinos || !data.ventas) {
-      alert('El archivo no tiene el formato correcto de backup.');
-      return;
-    }
-
-    alert(`Backup cargado: ${data.clientes.length} clientes, ${data.vinos.length} vinos, ${data.ventas.length} ventas. Exportado: ${data.exportado || 'sin fecha'}.`);
+    alert('Backup leído correctamente.');
 
     console.log(data);
 
   }catch(err){
 
-    alert('Error importando backup: el archivo no es un JSON válido.');
-    console.error(err);
+    alert('Error importando backup');
 
   }
 
