@@ -8,92 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<script>
 
-window.exportBackup = exportBackup;
-
-function renderPipeline(){
-
-  const estados = ['Nuevo','Contactado','Interesado','Cerrado'];
-
-  estados.forEach(estado=>{
-
-    const container = document.getElementById('pipe-' + estado);
-
-    if(!container) return;
-
-    const items = clientes.filter(c => {
-
-      const estadoCliente = (c.estado || '')
-        .toString()
-        .trim()
-        .toLowerCase();
-
-      return estadoCliente === estado.toLowerCase();
-
-    });
-
-    container.innerHTML = items.map(c => `
-      <div class="pipeline-card">
-        <div class="pipeline-company">${c.empresa || '-'}</div>
-        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-      </div>
-    `).join('');
-
-  });
-
-}
-
-function exportBackup(){
-
-  const data = {
-    clientes,
-    vinos,
-    ventas,
-    exportado: new Date().toISOString()
-  };
-
-  const blob = new Blob(
-    [JSON.stringify(data,null,2)],
-    { type:'application/json' }
-  );
-
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'crm-backup.json';
-  a.click();
-
-  URL.revokeObjectURL(url);
-
-}
-
-document.addEventListener('change', async (e)=>{
-
-  if(e.target.id !== 'import-backup') return;
-
-  const file = e.target.files[0];
-  if(!file) return;
-
-  try{
-
-    const text = await file.text();
-    const data = JSON.parse(text);
-
-    alert('Backup leído correctamente.');
-
-    console.log(data);
-
-  }catch(err){
-
-    alert('Error importando backup');
-
-  }
-
-});
-
-</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -288,7 +203,9 @@ body.dark textarea:focus {
 
   background: rgba(255,255,255,.05);
 
-}body.dark input,
+}
+
+body.dark input,
 body.dark select,
 body.dark textarea {
 
@@ -696,7 +613,10 @@ header {
 
 }
 
-/* ── TABLA VINOS ── */
+@media (min-width: 900px) {
+  #auto-backup-label { display: inline !important; }
+}
+
 #page-vinos .table-wrap { overflow-x: auto !important; }
 #page-vinos .table-wrap table { table-layout: auto; width: 100%; }
 
@@ -942,18 +862,17 @@ textarea {
   color: var(--text);
 
   background:
-  linear-gradient(
-    180deg,
-    rgba(255,255,255,.88),
-    rgba(255,255,255,.72)
-  );
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,.88),
+      rgba(255,255,255,.72)
+    );
 
-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 
-box-shadow:
-  inset 0 1px 0 rgba(255,255,255,.5),
-  0 1px 2px rgba(0,0,0,.03);
-
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.5),
+    0 1px 2px rgba(0,0,0,.03);
 
   outline: none;
 
@@ -962,9 +881,6 @@ box-shadow:
     box-shadow .18s,
     transform .12s,
     background .18s;
-
-  box-shadow:
-    0 1px 2px rgba(0,0,0,.03);
 
 }
 
@@ -2065,9 +1981,11 @@ transition:.2s;
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Exportar
       </button>
-      <button class="btn btn-outline" onclick="exportBackup()">
+      <button class="btn btn-outline" onclick="exportBackup()" title="Descargar backup manual ahora">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Backup
       </button>
+      <span id="auto-backup-label" style="font-size:.72rem;color:var(--text-muted);align-self:center;white-space:nowrap;display:none"></span>
       <button class="btn btn-outline" onclick="document.getElementById('import-backup').click()">
         Importar
       </button>
@@ -2556,6 +2474,7 @@ if (userBox) {
     await loadClientes();
     await loadVinos();
     await loadVentas();
+    scheduleAutoBackup();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -2771,9 +2690,10 @@ function getPrioridad(cliente) {
 }
 
 function pendingClientes() {
+  const todayStr = today();
   return clientes.filter(c =>
     c.proximo &&
-    new Date(c.proximo).toDateString() === new Date().toDateString() &&
+    c.proximo <= todayStr &&
     c.estado !== 'Cerrado' &&
     c.estado !== 'No interesa'
   );
@@ -2808,8 +2728,66 @@ function calcVentaGanancia(ventaRow) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// NAVIGATION
+// AUTO BACKUP DIARIO
 // ══════════════════════════════════════════════════════════════════════════════
+const AUTO_BACKUP_KEY = 'crm_last_auto_backup';
+const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+function scheduleAutoBackup() {
+  runAutoBackupIfNeeded();
+  updateAutoBackupLabel();
+  // Revisar cada hora si ya pasaron 24h
+  setInterval(runAutoBackupIfNeeded, 60 * 60 * 1000);
+}
+
+function runAutoBackupIfNeeded() {
+  const lastBackup = localStorage.getItem(AUTO_BACKUP_KEY);
+  const now = Date.now();
+  if (lastBackup && now - Number(lastBackup) < AUTO_BACKUP_INTERVAL_MS) {
+    updateAutoBackupLabel();
+    return;
+  }
+  // Solo hacer backup si hay datos
+  if (!clientes.length && !vinos.length) return;
+  doAutoBackup();
+}
+
+function doAutoBackup() {
+  try {
+    const data = {
+      clientes,
+      vinos,
+      ventas,
+      exportado: new Date().toISOString(),
+      tipo: 'auto'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fecha = new Date().toISOString().split('T')[0];
+    a.download = `crm-backup-auto-${fecha}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    localStorage.setItem(AUTO_BACKUP_KEY, String(Date.now()));
+    updateAutoBackupLabel();
+  } catch(e) {
+    console.error('Error en backup automático:', e);
+  }
+}
+
+function updateAutoBackupLabel() {
+  const el = document.getElementById('auto-backup-label');
+  if (!el) return;
+  const lastBackup = localStorage.getItem(AUTO_BACKUP_KEY);
+  if (!lastBackup) { el.textContent = 'Sin backup automático'; return; }
+  const d = new Date(Number(lastBackup));
+  el.textContent = `Último backup: ${d.toLocaleDateString('es-AR')} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+window.doAutoBackup = doAutoBackup;
+
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -2840,7 +2818,10 @@ function renderTable() {
   const filtered = clientes.filter(c => {
     const empresa  = (c.empresa  || '').toLowerCase();
     const contacto = (c.contacto || '').toLowerCase();
-    const matchQ = !q || empresa.includes(q) || contacto.includes(q);
+    const tipo     = (c.tipo     || '').toLowerCase();
+    const pais     = (c.pais     || '').toLowerCase();
+    const nota     = (c.nota     || '').toLowerCase();
+    const matchQ = !q || empresa.includes(q) || contacto.includes(q) || tipo.includes(q) || pais.includes(q) || nota.includes(q);
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
     return matchQ && matchE && matchP;
@@ -4896,6 +4877,7 @@ window.updateTipoMovInfo = updateTipoMovInfo;
 
 
 window.exportBackup = exportBackup;
+window.renderPipeline = renderPipeline;
 
 function renderPipeline(){
 
@@ -4907,7 +4889,10 @@ function renderPipeline(){
 
     if(!container) return;
 
-    const items = clientes.filter(c => c.estado === estado);
+    const items = clientes.filter(c => {
+      const estadoCliente = (c.estado || '').toString().trim().toLowerCase();
+      return estadoCliente === estado.toLowerCase();
+    });
 
     container.innerHTML = items.map(c => `
       <div class="pipeline-card">
@@ -4919,8 +4904,6 @@ function renderPipeline(){
   });
 
 }
-
-
 
 function exportBackup(){
 
@@ -4959,13 +4942,19 @@ document.addEventListener('change', async (e)=>{
     const text = await file.text();
     const data = JSON.parse(text);
 
-    alert('Backup leído correctamente.');
+    if (!data.clientes || !data.vinos || !data.ventas) {
+      alert('El archivo no tiene el formato correcto de backup.');
+      return;
+    }
+
+    alert(`Backup cargado: ${data.clientes.length} clientes, ${data.vinos.length} vinos, ${data.ventas.length} ventas. Exportado: ${data.exportado || 'sin fecha'}.`);
 
     console.log(data);
 
   }catch(err){
 
-    alert('Error importando backup');
+    alert('Error importando backup: el archivo no es un JSON válido.');
+    console.error(err);
 
   }
 
