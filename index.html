@@ -1982,6 +1982,7 @@ transition:.2s;
       <button class="btn btn-outline" onclick="exportBackup()">
         Backup
       </button>
+      <span id="last-backup-label" style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;align-self:center;"></span>
       <button class="btn btn-outline" onclick="document.getElementById('import-backup').click()">
         Importar
       </button>
@@ -2014,11 +2015,14 @@ transition:.2s;
   <!-- ALERTA STOCK BAJO -->
   <div id="stock-alert-container"></div>
 
-  <div class="toolbar">
+  <div class="toolbar" style="flex-wrap:wrap;gap:.5rem;">
     <button class="btn btn-primary" onclick="openWineModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Agregar Vino
     </button>
+    <input type="text" id="search-vino"     placeholder="Buscar vino…"     style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
+    <input type="text" id="search-bodega"   placeholder="Buscar bodega…"   style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
+    <input type="text" id="search-varietal" placeholder="Buscar varietal…" style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
     <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;">
       <label style="font-size:.8rem;color:var(--text-muted);font-weight:500;">Alerta stock bajo:</label>
       <input type="number" id="stock-threshold" value="6" min="1" style="width:70px;" onchange="renderVinos()">
@@ -2038,6 +2042,7 @@ transition:.2s;
           <th>Margen</th>
           <th>Stock</th>
           <th>Estado Stock</th>
+          <th>Activo</th>
           <th>Acciones</th>
         </tr>
       </thead>
@@ -2434,6 +2439,7 @@ if (userBox) {
     await loadClientes();
     await loadVinos();
     await loadVentas();
+    checkAutoBackup();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -3098,14 +3104,20 @@ function filterPendientes() {
 // RENDER VINOS — con margen, stock bajo
 // ══════════════════════════════════════════════════════════════════════════════
 function renderVinos() {
-  const tbody    = document.getElementById('tbody-vinos');
+  const tbody     = document.getElementById('tbody-vinos');
   const container = document.getElementById('stock-alert-container');
   if (!tbody) return;
 
   const threshold  = getStockThreshold();
-  const lowStockVinos = vinos.filter(v => Number(v.stock_actual || 0) <= threshold);
+  const qVino      = (document.getElementById('search-vino')?.value     || '').toLowerCase().trim();
+  const qBodega    = (document.getElementById('search-bodega')?.value   || '').toLowerCase().trim();
+  const qVarietal  = (document.getElementById('search-varietal')?.value || '').toLowerCase().trim();
 
-  // Alerta de stock bajo en la parte superior
+  // Alerta solo para vinos activos con stock bajo
+  const lowStockVinos = vinos.filter(v =>
+    !v.inactivo && Number(v.stock_actual || 0) <= threshold
+  );
+
   if (container) {
     if (lowStockVinos.length > 0) {
       container.innerHTML = `
@@ -3126,15 +3138,23 @@ function renderVinos() {
     }
   }
 
-  if (vinos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">No hay vinos cargados.</div></td></tr>`;
+  const filtered = vinos.filter(v => {
+    if (qVino     && !(v.nombre   || '').toLowerCase().includes(qVino))     return false;
+    if (qBodega   && !(v.bodega   || '').toLowerCase().includes(qBodega))   return false;
+    if (qVarietal && !(v.varietal || '').toLowerCase().includes(qVarietal))  return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">No hay vinos que coincidan.</div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = vinos.map(v => {
-    const margen   = calcMargen(v);
-    const stock    = Number(v.stock_actual || 0);
-    const isLow    = stock <= threshold;
+  tbody.innerHTML = filtered.map(v => {
+    const inactivo   = !!v.inactivo;
+    const margen     = calcMargen(v);
+    const stock      = Number(v.stock_actual || 0);
+    const isLow      = !inactivo && stock <= threshold;
 
     const margenHTML = margen
       ? `<span class="badge ${margen.bruto >= 0 ? 'badge-profit' : 'badge-loss'}">
@@ -3142,12 +3162,16 @@ function renderVinos() {
          </span>`
       : `<span class="badge badge-outline">—</span>`;
 
-    const stockBadge = isLow
-      ? `<span class="badge badge-stock-low">⚠️ Bajo (${stock})</span>`
-      : `<span class="badge badge-stock-ok">✓ OK (${stock})</span>`;
+    const stockBadge = inactivo
+      ? `<span class="badge badge-outline" style="color:#aaa">Inactivo</span>`
+      : isLow
+        ? `<span class="badge badge-stock-low">⚠️ Bajo (${stock})</span>`
+        : `<span class="badge badge-stock-ok">✓ OK (${stock})</span>`;
+
+    const rowStyle = inactivo ? 'background:#9ca3af;color:#1f2937;' : '';
 
     return `
-      <tr class="${isLow ? 'low-stock' : ''}">
+      <tr class="${isLow ? 'low-stock' : ''}" style="${rowStyle}">
         <td style="font-weight:600">${esc(v.nombre)}</td>
         <td>${esc(v.bodega || '—')}</td>
         <td>${esc(v.varietal || '—')}</td>
@@ -3156,6 +3180,12 @@ function renderVinos() {
         <td>${margenHTML}</td>
         <td>${stock}</td>
         <td>${stockBadge}</td>
+        <td>
+          <button class="btn btn-ghost" style="font-size:.75rem;padding:.2rem .5rem;color:${inactivo ? '#16a34a' : '#b45309'};"
+            onclick="toggleVinoActivo('${v.id}')">
+            ${inactivo ? '✓ Activar' : '⏸ Desactivar'}
+          </button>
+        </td>
         <td class="td-actions">
           <button class="btn btn-ghost" onclick="openWineModal('${v.id}')" title="Editar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -3845,8 +3875,13 @@ const entry = {
         continue; // Sin efecto en stock
       }
 
+      const updateData = { stock_actual: nuevoStock };
+      // Si es devolución y el vino estaba inactivo, lo reactivamos automáticamente
+      if (esDevolucion && vino.inactivo) {
+        updateData.inactivo = false;
+      }
       const { error: stockError } = await supabase.from('vinos')
-        .update({ stock_actual: nuevoStock }).eq('id', venta.vinoId);
+        .update(updateData).eq('id', venta.vinoId);
       if (stockError) { console.error(stockError); alert('Error actualizando stock'); return; }
 
       // Solo insertar en tabla ventas si es Venta (para facturación y ganancias)
@@ -4071,6 +4106,11 @@ async function deleteHistorial(clienteId, historialId) {
 function addWineLine() {
   const container = document.getElementById('wine-lines');
   if (!container) return;
+  const tipo = document.getElementById('nc-tipo-movimiento')?.value || 'Venta';
+  const esDev = tipo === 'Devolución';
+  // En devolución: mostrar TODOS los vinos (activos, inactivos, sin stock)
+  // En cualquier otro caso: solo activos
+  const vinosOpts = esDev ? vinos : vinos.filter(v => !v.inactivo);
   container.insertAdjacentHTML('beforeend', `
     <div class="wine-line" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-top:.75rem;">
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:.6rem;">
@@ -4078,7 +4118,7 @@ function addWineLine() {
           <label>Vino</label>
           <select class="wine-vino" onchange="updateWineInfo(this)">
             <option value="">Seleccione…</option>
-            ${vinos.map(v => `<option value="${v.id}">${esc(v.nombre)} (stock: ${v.stock_actual})</option>`).join('')}
+            ${vinosOpts.map(v => `<option value="${v.id}">${esc(v.nombre)} (stock: ${v.stock_actual})${v.inactivo ? ' — Inactivo' : ''}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -4591,6 +4631,9 @@ function syncOverlay() {
 document.getElementById('search').addEventListener('input', renderTable);
 document.getElementById('filterEstado').addEventListener('change', renderTable);
 document.getElementById('filterPais').addEventListener('change', renderTable);
+document.getElementById('search-vino').addEventListener('input', renderVinos);
+document.getElementById('search-bodega').addEventListener('input', renderVinos);
+document.getElementById('search-varietal').addEventListener('input', renderVinos);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GLOBAL EXPORTS
@@ -4617,7 +4660,7 @@ function addEditWineLine() {
           <label>Vino</label>
 
           <select class="edit-vino">
-            ${vinos.map(v => `
+            ${vinos.filter(v => !v.inactivo).map(v => `
               <option value="${v.id}">
                 ${v.nombre}
               </option>
@@ -4849,6 +4892,70 @@ window.updateTipoMovInfo = updateTipoMovInfo;
 window.sincronizarVentasDesdeHistorial = sincronizarVentasDesdeHistorial;
 
 
+// ══════════════════════════════════════════════════════════════════════════════
+// VINO — activar / desactivar
+// ══════════════════════════════════════════════════════════════════════════════
+async function toggleVinoActivo(id) {
+  const vino = vinos.find(v => v.id === id);
+  if (!vino) return;
+  const nuevoEstado = !vino.inactivo;
+  const { error } = await supabase.from('vinos').update({ inactivo: nuevoEstado }).eq('id', id);
+  if (error) { console.error(error); alert('Error actualizando vino'); return; }
+  await loadVinos();
+}
+window.toggleVinoActivo = toggleVinoActivo;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BACKUP — exportación manual + autobackup diario + label
+// ══════════════════════════════════════════════════════════════════════════════
+function exportBackup() {
+  const data = { clientes, vinos, ventas, exportado: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `crm-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  localStorage.setItem('crm_last_backup', new Date().toISOString());
+  updateBackupLabel();
+}
+window.exportBackup = exportBackup;
+
+function updateBackupLabel() {
+  const el = document.getElementById('last-backup-label');
+  if (!el) return;
+  const ts = localStorage.getItem('crm_last_backup');
+  if (!ts) { el.textContent = 'Sin backup reciente'; return; }
+  const d = new Date(ts);
+  el.textContent = `Último backup: ${d.toLocaleDateString('es-ES')} ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function checkAutoBackup() {
+  setTimeout(() => {
+    const ts     = localStorage.getItem('crm_last_backup');
+    const hoy    = new Date().toISOString().slice(0, 10);
+    const ultimo = ts ? ts.slice(0, 10) : null;
+    if (ultimo !== hoy && (clientes.length > 0 || vinos.length > 0)) {
+      exportBackup();
+    }
+    updateBackupLabel();
+  }, 1000);
+}
+
+document.addEventListener('change', async (e) => {
+  if (e.target.id !== 'import-backup') return;
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    alert('Backup leído correctamente.');
+    console.log(data);
+  } catch(err) {
+    alert('Error importando backup');
+  }
+});
 
 </script>
 </body>
