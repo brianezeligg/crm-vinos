@@ -8,92 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<script>
-
-window.exportBackup = exportBackup;
-
-function renderPipeline(){
-
-  const estados = ['Nuevo','Contactado','Interesado','Cerrado'];
-
-  estados.forEach(estado=>{
-
-    const container = document.getElementById('pipe-' + estado);
-
-    if(!container) return;
-
-    const items = clientes.filter(c => {
-
-      const estadoCliente = (c.estado || '')
-        .toString()
-        .trim()
-        .toLowerCase();
-
-      return estadoCliente === estado.toLowerCase();
-
-    });
-
-    container.innerHTML = items.map(c => `
-      <div class="pipeline-card">
-        <div class="pipeline-company">${c.empresa || '-'}</div>
-        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-      </div>
-    `).join('');
-
-  });
-
-}
-
-function exportBackup(){
-
-  const data = {
-    clientes,
-    vinos,
-    ventas,
-    exportado: new Date().toISOString()
-  };
-
-  const blob = new Blob(
-    [JSON.stringify(data,null,2)],
-    { type:'application/json' }
-  );
-
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'crm-backup.json';
-  a.click();
-
-  URL.revokeObjectURL(url);
-
-}
-
-document.addEventListener('change', async (e)=>{
-
-  if(e.target.id !== 'import-backup') return;
-
-  const file = e.target.files[0];
-  if(!file) return;
-
-  try{
-
-    const text = await file.text();
-    const data = JSON.parse(text);
-
-    alert('Backup leído correctamente.');
-
-    console.log(data);
-
-  }catch(err){
-
-    alert('Error importando backup');
-
-  }
-
-});
-
-</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2271,24 +2185,6 @@ transition:.2s;
   </div>
   <div class="sheet-body" id="sheet-body"></div>
 <div class="sheet-footer">
-
-  <button
-    class="btn btn-success"
-    onclick="openWhatsApp()"
-  >
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-    >
-      <path d="M21 11.5a8.38 8.38 0 0 1-1.9 5.4A8.5 8.5 0 1 1 21 11.5z"/>
-      <path d="M8 12s1.5 3 4 4c0 0 1-.5 1.5-1 .4-.4 1-.3 1.3 0l1.2 1.2c.3.3.3.9-.1 1.2-.8.7-2 1.3-3.4 1.1-2.3-.3-4.8-2.1-6.4-4.6-1.5-2.5-1.9-5-.9-6.8.5-.9 1.4-1.5 2.3-1.7.5-.1 1 .2 1.1.7l.5 1.6c.1.4 0 .9-.4 1.1-.5.4-1 .8-1 .8z"/>
-    </svg>
-
-    WhatsApp
-  </button>
-
   <button
     class="btn btn-outline"
     style="flex:1"
@@ -2727,10 +2623,25 @@ async function loadClientes() {
   }))
 }));
 
-  setTimeout(() => {
-    renderTable();
-    renderPipeline();
-  }, 0);
+  renderTable();
+  renderPipeline();
+}
+
+function renderPipeline() {
+  const estados = ['Nuevo', 'Contactado', 'Interesado', 'Cerrado'];
+  estados.forEach(estado => {
+    const container = document.getElementById('pipe-' + estado);
+    if (!container) return;
+    const items = clientes.filter(c =>
+      (c.estado || '').toString().trim().toLowerCase() === estado.toLowerCase()
+    );
+    container.innerHTML = items.map(c => `
+      <div class="pipeline-card">
+        <div class="pipeline-company">${c.empresa || '-'}</div>
+        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
+      </div>
+    `).join('') || '<div style="color:var(--text-muted);font-size:.8rem;padding:.5rem">Sin clientes</div>';
+  });
 }
 
 let editingId = null;
@@ -3353,8 +3264,15 @@ function renderFinanciero() {
 // ══════════════════════════════════════════════════════════════════════════════
 // MODAL ADD/EDIT CLIENTE
 // ══════════════════════════════════════════════════════════════════════════════
+function resetModalBtn() {
+  savingCliente = false;
+  const btn = document.querySelector('#modal .btn-primary');
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
+}
+
 function openModal(id) {
   editingId = id || null;
+  resetModalBtn();
   const c = id ? clientes.find(x => x.id === id) : {};
   document.getElementById('modal-title').textContent = id ? 'Editar Cliente' : 'Nuevo Cliente';
   document.getElementById('f-empresa').value   = c.empresa   || '';
@@ -3364,7 +3282,7 @@ function openModal(id) {
   document.getElementById('f-telefono').value  = c.telefono  || '';
   document.getElementById('f-email').value     = c.email     || '';
   document.getElementById('f-direccion').value = c.direccion || '';
-document.getElementById('f-logo').value = c.logo || '';
+  document.getElementById('f-logo').value      = c.logo      || '';
   document.getElementById('f-estado').value    = c.estado    || '';
   document.getElementById('f-fecha').value     = c.fecha     || '';
   document.getElementById('f-proximo').value   = c.proximo   || '';
@@ -3379,6 +3297,7 @@ function closeModal() {
   document.getElementById('modal').classList.remove('open');
   syncOverlay();
   editingId = null;
+  resetModalBtn();
 }
 
 let savingCliente = false;
@@ -4930,81 +4849,6 @@ window.updateTipoMovInfo = updateTipoMovInfo;
 window.sincronizarVentasDesdeHistorial = sincronizarVentasDesdeHistorial;
 
 
-window.exportBackup = exportBackup;
-
-function renderPipeline(){
-
-  const estados = ['Nuevo','Contactado','Interesado','Cerrado'];
-
-  estados.forEach(estado=>{
-
-    const container = document.getElementById('pipe-' + estado);
-
-    if(!container) return;
-
-    const items = clientes.filter(c => c.estado === estado);
-
-    container.innerHTML = items.map(c => `
-      <div class="pipeline-card">
-        <div class="pipeline-company">${c.empresa || '-'}</div>
-        <div class="pipeline-meta">${c.pais || '-'} · ${c.contacto || '-'}</div>
-      </div>
-    `).join('');
-
-  });
-
-}
-
-
-
-function exportBackup(){
-
-  const data = {
-    clientes,
-    vinos,
-    ventas,
-    exportado: new Date().toISOString()
-  };
-
-  const blob = new Blob(
-    [JSON.stringify(data,null,2)],
-    { type:'application/json' }
-  );
-
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'crm-backup.json';
-  a.click();
-
-  URL.revokeObjectURL(url);
-
-}
-
-document.addEventListener('change', async (e)=>{
-
-  if(e.target.id !== 'import-backup') return;
-
-  const file = e.target.files[0];
-  if(!file) return;
-
-  try{
-
-    const text = await file.text();
-    const data = JSON.parse(text);
-
-    alert('Backup leído correctamente.');
-
-    console.log(data);
-
-  }catch(err){
-
-    alert('Error importando backup');
-
-  }
-
-});
 
 </script>
 </body>
