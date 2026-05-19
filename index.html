@@ -2601,7 +2601,7 @@ async function sincronizarVentasDesdeHistorial() {
 
       for (const v of h.ventas) {
         const vino = vinos.find(vi => vi.id === v.vinoId);
-        const compra = vino ? Number(vino.precio_venta || 0) : 0;
+        const compra = vino ? Number(vino.precio_compra || 0) : 0;
         const cant   = tipo === 'Devolución' ? -Math.abs(Number(v.cantidad || 0)) : Number(v.cantidad || 0);
         const precio = Number(v.precio || compra || 0);
         const total  = precio * cant;
@@ -2797,6 +2797,7 @@ function showPage(name) {
   if (name === 'estadisticas') renderStats();
   if (name === 'financiero')   renderFinanciero();
   if (name === 'vinos')        renderVinos();
+  if (name === 'pipeline')     renderPipeline();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2952,10 +2953,7 @@ function renderStatCards() {
   const cerrados =
     clientes.filter(c => c.estado === 'Cerrado').length;
 
-  const conversion =
-    interesados > 0
-      ? Math.round((cerrados / interesados) * 100)
-      : 0;
+  const conversion = 0; // eliminado — métrica poco útil
 
   const gastoPorCliente = {};
 
@@ -3044,14 +3042,6 @@ const topClienteTotal =
     hl: pending > 0,
     icon: '🔔',
     class: pending > 0 ? 'highlight' : ''
-  },
-
-  {
-    label: 'Conversión',
-    num: conversion + '%',
-    hl: false,
-    icon: '📈',
-    class: 'positive'
   },
 
   {
@@ -3462,49 +3452,52 @@ async function saveCliente() {
   const btn = document.querySelector('#modal .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
-  const empresa = document.getElementById('f-empresa').value.trim();
-  if (!empresa) {
-    alert('El nombre de la empresa es obligatorio.');
+  try {
+    const empresa = document.getElementById('f-empresa').value.trim();
+    if (!empresa) {
+      alert('El nombre de la empresa es obligatorio.');
+      return;
+    }
+
+    const c = {
+      empresa,
+      tipo:          document.getElementById('f-tipo').value,
+      pais:          document.getElementById('f-pais').value,
+      contacto:      document.getElementById('f-contacto').value.trim(),
+      telefono:      document.getElementById('f-telefono').value.trim(),
+      email:         document.getElementById('f-email').value.trim(),
+      direccion:     document.getElementById('f-direccion').value.trim(),
+      logo:          document.getElementById('f-logo').value.trim(),
+      estado:        document.getElementById('f-estado').value,
+      fecha:         document.getElementById('f-fecha').value,
+      proximo:       document.getElementById('f-proximo').value,
+      nota:          document.getElementById('f-nota').value.trim(),
+      private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
+      iban:          document.getElementById('f-iban').value.trim(),
+    };
+
+    let error;
+    if (editingId) {
+      ({ error } = await supabase.from('clientes').update(c).eq('id', editingId));
+    } else {
+      ({ error } = await supabase.from('clientes').insert([{ ...c, historial: [] }]));
+    }
+
+    if (error) {
+      console.error(error);
+      alert('Error guardando cliente');
+      return;
+    }
+
+    closeModal();
+    await loadClientes();
+  } catch (err) {
+    console.error('Error inesperado:', err);
+    alert('Error inesperado al guardar');
+  } finally {
     savingCliente = false;
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
-    return;
   }
-
-  const c = {
-    empresa,
-    tipo:      document.getElementById('f-tipo').value,
-    pais:      document.getElementById('f-pais').value,
-    contacto:  document.getElementById('f-contacto').value.trim(),
-    telefono:  document.getElementById('f-telefono').value.trim(),
-    email:     document.getElementById('f-email').value.trim(),
-    direccion: document.getElementById('f-direccion').value.trim(),
-    logo: document.getElementById('f-logo').value.trim(),
-    estado:    document.getElementById('f-estado').value,
-    fecha:     document.getElementById('f-fecha').value,
-    proximo:   document.getElementById('f-proximo').value,
-    nota:      document.getElementById('f-nota').value.trim(),
-    private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
-    iban:      document.getElementById('f-iban').value.trim(),
-  };
-
-  let error;
-  if (editingId) {
-    ({ error } = await supabase.from('clientes').update(c).eq('id', editingId));
-  } else {
-    ({ error } = await supabase.from('clientes').insert([{ ...c, historial: [] }]));
-  }
-
-  if (error) {
-    console.error(error); alert('Error guardando cliente');
-    savingCliente = false;
-    if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
-    return;
-  }
-
-  closeModal();
-  await loadClientes();
-  savingCliente = false;
-  if (btn) { btn.disabled = false; btn.textContent = 'Guardar Cliente'; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4383,7 +4376,7 @@ if (existingWineModal) {
   editingWineId = id;
   const vino = id ? vinos.find(v => v.id === id) : {};
   document.body.insertAdjacentHTML('beforeend', `
-    <div class="modal open" id="wine-modal">
+    <div class="modal" id="wine-modal">
       <div class="modal-box">
         <div class="modal-header"><h3>${id ? 'Editar Vino' : 'Nuevo Vino'}</h3></div>
         <div class="modal-body">
@@ -4446,6 +4439,10 @@ if (existingWineModal) {
       }
     });
   });
+
+  // Mostrar el modal y el overlay
+  document.getElementById('wine-modal').classList.add('open');
+  syncOverlay();
 }
 
 function closeWineModal() {
@@ -5033,28 +5030,43 @@ window.toggleVinoActivo = toggleVinoActivo;
 // BACKUP — exportación manual + autobackup diario + label
 // ══════════════════════════════════════════════════════════════════════════════
 function exportBackup() {
-  // Backup manual: descarga el archivo
-  const data = { clientes, vinos, ventas, exportado: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `crm-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const ahora = new Date();
+  const fecha = ahora.toISOString().slice(0,10);
+  const hora  = ahora.toTimeString().slice(0,8).replace(/:/g,'-');
+  const data  = { clientes, vinos, ventas, exportado: ahora.toISOString() };
+  const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href      = url;
+  a.download  = `backup/crm-backup-${fecha}_${hora}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  localStorage.setItem('crm_last_backup', new Date().toISOString());
+  localStorage.setItem('crm_last_backup', ahora.toISOString());
   updateBackupLabel();
 }
 window.exportBackup = exportBackup;
 
 function silentBackup() {
-  // Backup automático: guarda en localStorage sin diálogo de descarga
   try {
-    const data = { clientes, vinos, ventas, exportado: new Date().toISOString() };
-    localStorage.setItem('crm_auto_backup', JSON.stringify(data));
-    localStorage.setItem('crm_last_backup', new Date().toISOString());
+    const ahora   = new Date();
+    const data    = { clientes, vinos, ventas, exportado: ahora.toISOString() };
+    const jsonStr = JSON.stringify(data, null, 2);
+
+    // Si corre en Electron, guarda directo a la carpeta backup/
+    if (window.electronAPI?.saveBackup) {
+      window.electronAPI.saveBackup(jsonStr).then(res => {
+        if (res.ok) console.log('Backup guardado en disco:', res.filename);
+        else        console.error('Error backup:', res.error);
+      });
+    } else {
+      // Fallback: guarda en localStorage
+      const key = `crm_auto_backup_${ahora.toISOString().slice(0,10)}`;
+      localStorage.setItem(key, jsonStr);
+    }
+
+    localStorage.setItem('crm_last_backup', ahora.toISOString());
     updateBackupLabel();
-    console.log('Auto-backup silencioso guardado:', new Date().toLocaleString('es-ES'));
+    console.log('Auto-backup ejecutado:', ahora.toLocaleString('es-ES'));
   } catch(e) {
     console.error('Error en auto-backup:', e);
   }
@@ -5069,13 +5081,13 @@ function updateBackupLabel() {
   el.textContent = `Último backup: ${d.toLocaleDateString('es-ES')} ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+let _backupDone = false;
 function checkAutoBackup() {
+  if (_backupDone) return;
+  _backupDone = true;
   setTimeout(() => {
-    const ts     = localStorage.getItem('crm_last_backup');
-    const hoy    = new Date().toISOString().slice(0, 10);
-    const ultimo = ts ? ts.slice(0, 10) : null;
-    if (ultimo !== hoy && (clientes.length > 0 || vinos.length > 0)) {
-      silentBackup(); // silencioso, sin diálogo
+    if (clientes.length > 0 || vinos.length > 0) {
+      silentBackup();
     }
     updateBackupLabel();
   }, 1000);
