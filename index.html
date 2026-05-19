@@ -611,8 +611,25 @@ header {
 }
 
 /* ── TABLA VINOS ── */
-#page-vinos .table-wrap { overflow-x: auto !important; }
-#page-vinos .table-wrap table { table-layout: auto; width: 100%; }
+#wv-stock-inicial::-webkit-inner-spin-button,
+#wv-stock-inicial::-webkit-outer-spin-button,
+#wv-stock-actual::-webkit-inner-spin-button,
+#wv-stock-actual::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#wv-stock-inicial, #wv-stock-actual { -moz-appearance: textfield; }
+#page-vinos .table-wrap table { table-layout: fixed; width: 100%; font-size: .78rem; }
+#page-vinos .table-wrap thead th { font-size: .67rem; padding: .5rem .5rem; white-space: normal; }
+#page-vinos .table-wrap tbody td { padding: .45rem .5rem; }
+#page-vinos .table-wrap th:nth-child(1) { width: 22%; } /* Vino */
+#page-vinos .table-wrap th:nth-child(2) { width: 13%; } /* Bodega */
+#page-vinos .table-wrap th:nth-child(3) { width: 11%; } /* Varietal */
+#page-vinos .table-wrap th:nth-child(4) { width: 8%;  } /* P.Compra */
+#page-vinos .table-wrap th:nth-child(5) { width: 8%;  } /* P.Venta */
+#page-vinos .table-wrap th:nth-child(6) { width: 10%; } /* Margen */
+#page-vinos .table-wrap th:nth-child(7) { width: 5%;  } /* Stock */
+#page-vinos .table-wrap th:nth-child(8) { width: 10%; } /* Estado Stock */
+#page-vinos .table-wrap th:nth-child(9) { width: 5%;  text-align:center; } /* Activo */
+#page-vinos .table-wrap th:nth-child(10){ width: 8%;  } /* Acciones */
+#page-vinos input[type=checkbox].vino-activo { width:18px; height:18px; cursor:pointer; accent-color:var(--accent); }
 
 /* Badges compactos en tabla */
 #table-clientes td[data-col="prioridad"] .badge,
@@ -1999,7 +2016,7 @@ transition:.2s;
       <thead>
         <tr>
           <th>Empresa</th><th>Tipo</th><th>País</th>
-          <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Último cont.</th><th>Acc.</th>
+          <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Próx. seguimiento</th><th>Acc.</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -2058,6 +2075,11 @@ transition:.2s;
 
   <div class="stats-grid" id="stats-grid-fin"></div>
 
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;">
+    <div style="font-weight:600;color:var(--accent);margin-bottom:.75rem;">💰 Comisiones por vendedor</div>
+    <div id="comision-resumen" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;"></div>
+  </div>
+
   <div class="toolbar">
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -2082,6 +2104,7 @@ transition:.2s;
           <th>Total Gastado</th>
           <th>Costo Total</th>
           <th>Ganancia Neta</th>
+          <th>Mi comisión</th>
           <th>Última Compra</th>
         </tr>
       </thead>
@@ -2797,6 +2820,12 @@ function renderTable() {
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
     return matchQ && matchE && matchP;
+  }).sort((a, b) => {
+    // Próximo seguimiento: primero los que tienen fecha, ordenados de más cercano a más lejano. Sin fecha al final.
+    if (a.proximo && b.proximo) return a.proximo.localeCompare(b.proximo);
+    if (a.proximo) return -1;
+    if (b.proximo) return 1;
+    return 0;
   });
 
   const tbody = document.getElementById('tbody');
@@ -2894,7 +2923,7 @@ return `
             </span>
           </td>
 
-          <td data-col="fecha" class="td-muted">${esc(c.fecha || '—')}</td>
+          <td data-col="fecha" class="td-muted" style="${c.proximo && c.proximo >= today() ? 'color:#16a34a;font-weight:600' : c.proximo && c.proximo < today() ? 'color:#b91c1c;font-weight:600' : ''}">${esc(c.proximo || '—')}</td>
 
           <td data-col="acc" class="td-actions">
             <button class="btn btn-ghost" onclick="event.stopPropagation();openModal('${c.id}')" title="Editar">
@@ -3180,11 +3209,11 @@ function renderVinos() {
         <td>${margenHTML}</td>
         <td>${stock}</td>
         <td>${stockBadge}</td>
-        <td>
-          <button class="btn btn-ghost" style="font-size:.75rem;padding:.2rem .5rem;color:${inactivo ? '#16a34a' : '#b45309'};"
-            onclick="toggleVinoActivo('${v.id}')">
-            ${inactivo ? '✓ Activar' : '⏸ Desactivar'}
-          </button>
+        <td style="text-align:center;">
+          <input type="checkbox" class="vino-activo"
+            ${inactivo ? '' : 'checked'}
+            title="${inactivo ? 'Activar' : 'Desactivar'}"
+            onclick="event.stopPropagation();toggleVinoActivo('${v.id}')">
         </td>
         <td class="td-actions">
           <button class="btn btn-ghost" onclick="openWineModal('${v.id}')" title="Editar">
@@ -3205,57 +3234,133 @@ function renderVinos() {
 function renderFinanciero() {
   const q = (document.getElementById('search-fin')?.value || '').toLowerCase().trim();
 
-  // Agrupa ventas por cliente
-  const porCliente = {};
+  // Cargar % guardado
+  // Agrupa ventas por cliente + por vendedor
+  const porCliente  = {};
+  const porVendedor  = {}; // { nombre: totalBruto }
+  const porMes       = {}; // { 'YYYY-MM': { vendedor: total } }
+
   ventas.forEach(v => {
     if (!porCliente[v.cliente_id]) {
       porCliente[v.cliente_id] = {
-        id:         v.cliente_id,
-        nombre:     v.cliente_nombre || '—',
-        compras:    0,
-        botellas:   0,
-        total:      0,
-        costo:      0,
-        ganancia:   0,
-        ultima:     null,
-        pais:       ''
+        id: v.cliente_id, nombre: v.cliente_nombre || '—',
+        compras: 0, botellas: 0, total: 0, costo: 0, ganancia: 0,
+        porVendedor: {}, ultima: null, pais: ''
       };
     }
-    const row   = porCliente[v.cliente_id];
-    const vino  = vinos.find(vi => vi.id === v.vino_id);
+    const row    = porCliente[v.cliente_id];
+    const vino   = vinos.find(vi => vi.id === v.vino_id);
     const compra = vino ? Number(vino.precio_compra || 0) : 0;
     const cant   = Number(v.cantidad || 0);
     const tot    = Number(v.total || 0);
-    // costo siempre usa valor absoluto de cant para no restar doble en devoluciones
-    const costoV = compra * cant; // cant negativo en devolución → costo negativo → correcto
+    const costoV = compra * cant;
 
-    if (cant > 0) row.compras++; // solo contar ventas reales, no devoluciones
-    row.botellas += cant;        // resta en devoluciones = correcto
+    if (cant > 0) row.compras++;
+    row.botellas += cant;
     row.total    += tot;
     row.costo    += costoV;
     row.ganancia += (tot - costoV);
 
+    if (v.vendedor && cant !== 0) {
+      row.porVendedor[v.vendedor] = (row.porVendedor[v.vendedor] || 0) + tot;
+      porVendedor[v.vendedor]     = (porVendedor[v.vendedor] || 0) + tot;
+
+      // Acumular por mes
+      const mes = (v.fecha || '').slice(0, 7); // 'YYYY-MM'
+      if (mes) {
+        if (!porMes[mes]) porMes[mes] = {};
+        porMes[mes][v.vendedor] = (porMes[mes][v.vendedor] || 0) + tot;
+      }
+    }
+
     if (cant > 0 && (!row.ultima || v.fecha > row.ultima)) row.ultima = v.fecha;
   });
 
-  // Agrega info de país desde clientes
   Object.values(porCliente).forEach(row => {
     const cl = clientes.find(c => c.id === row.id);
     if (cl) row.pais = cl.pais || '';
   });
 
-  // Estadísticas globales
-  const filas = Object.values(porCliente);
+  const filas           = Object.values(porCliente);
   const totalFacturado  = filas.reduce((a, r) => a + r.total, 0);
   const totalGanancia   = filas.reduce((a, r) => a + r.ganancia, 0);
   const totalBotellas   = filas.reduce((a, r) => a + r.botellas, 0);
-  const mejorCliente    = filas.sort((a, b) => b.total - a.total)[0];
+
+  // Resumen con input por vendedor + desglose mensual
+  const resumenEl = document.getElementById('comision-resumen');
+  if (resumenEl) {
+    const vendedores = Object.entries(porVendedor).sort((a, b) => b[1] - a[1]);
+    if (vendedores.length === 0) {
+      resumenEl.innerHTML = '<span style="font-size:.85rem;color:var(--text-muted)">Sin ventas registradas aún</span>';
+    } else {
+      const nombresVendedores = vendedores.map(([n]) => n);
+
+      const totalesHTML = vendedores.map(([nombre, total]) => {
+        const key      = `crm_comision_pct_${nombre}`;
+        const savedV   = localStorage.getItem(key) || '10';
+        const pctV     = parseFloat(savedV) / 100;
+        const comision = (total * pctV).toFixed(2);
+        return `
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:.5rem .9rem;display:flex;align-items:center;gap:.5rem;font-size:.85rem;">
+            <span>👤 <strong>${esc(nombre)}</strong></span>
+            <input type="number" value="${savedV}" min="0" max="100" step="0.5"
+              style="width:55px;border:1px solid var(--border);border-radius:6px;padding:.2rem .4rem;background:var(--bg-card);color:var(--text-primary);font-size:.8rem;"
+              title="% comisión de ${esc(nombre)}"
+              oninput="localStorage.setItem('crm_comision_pct_${nombre}', this.value); renderFinanciero()">
+            <span style="font-size:.75rem;color:var(--text-muted);">%  —  Total:</span>
+            <span style="color:#16a34a;font-weight:700;">€ ${comision}</span>
+          </div>
+        `;
+      }).join('');
+
+      const meses = Object.keys(porMes).sort().reverse();
+      const mesHTML = meses.length === 0 ? '' : `
+        <div style="width:100%;margin-top:.75rem;">
+          <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem;">Desglose mensual</div>
+          <table style="border-collapse:collapse;font-size:.82rem;">
+            <thead>
+              <tr style="background:var(--bg-secondary);">
+                <th style="padding:.4rem .75rem;text-align:left;border:1px solid var(--border);color:var(--text-muted);font-size:.72rem;">MES</th>
+                ${nombresVendedores.map(n => `<th style="padding:.4rem .75rem;border:1px solid var(--border);color:var(--text-muted);font-size:.72rem;">${esc(n)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${meses.map(mes => {
+                const [anio, m] = mes.split('-');
+                const nombreMes = new Date(anio, m - 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+                return `<tr>
+                  <td style="padding:.4rem .75rem;border:1px solid var(--border);font-weight:600;text-transform:capitalize;">${nombreMes}</td>
+                  ${nombresVendedores.map(nombre => {
+                    const totalMes = porMes[mes][nombre] || 0;
+                    const pctV = parseFloat(localStorage.getItem('crm_comision_pct_' + nombre) || '10') / 100;
+                    return `<td style="padding:.4rem .75rem;border:1px solid var(--border);color:${totalMes !== 0 ? '#16a34a' : 'var(--text-muted)'};font-weight:${totalMes !== 0 ? '600' : '400'};">
+                      ${totalMes !== 0 ? '€ ' + (totalMes * pctV).toFixed(2) : '—'}
+                    </td>`;
+                  }).join('')}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      resumenEl.style.flexDirection = 'column';
+      resumenEl.style.alignItems    = 'flex-start';
+      resumenEl.innerHTML = `<div style="display:flex;gap:.75rem;flex-wrap:wrap;">${totalesHTML}</div>${mesHTML}`;
+    }
+  }
+
+  // Para la tabla: pct por vendedor
+  const pctPorVendedor = (nombre) => {
+    const key = `crm_comision_pct_${nombre}`;
+    return parseFloat(localStorage.getItem(key) || '10') / 100;
+  };
 
   document.getElementById('stats-grid-fin').innerHTML = [
-    { label: 'Facturación Total',  num: `€ ${totalFacturado.toFixed(2)}`, hl: false },
-    { label: 'Ganancia Neta Total',num: `€ ${totalGanancia.toFixed(2)}`,  hl: true  },
-    { label: 'Botellas Vendidas',  num: totalBotellas,                    hl: false },
-    { label: 'Clientes Activos',   num: filas.length,                     hl: false },
+    { label: 'Facturación Total',   num: `€ ${totalFacturado.toFixed(2)}`, hl: false },
+    { label: 'Ganancia Neta Total', num: `€ ${totalGanancia.toFixed(2)}`,  hl: true  },
+    { label: 'Botellas Vendidas',   num: totalBotellas,                    hl: false },
+    { label: 'Clientes Activos',    num: filas.length,                     hl: false },
   ].map(d => `
     <div class="stat-card ${d.hl ? 'positive' : ''}">
       <div class="stat-label">${d.label}</div>
@@ -3263,19 +3368,37 @@ function renderFinanciero() {
     </div>
   `).join('');
 
-  // Filtra y ordena
   const filtradas = filas
     .filter(r => !q || r.nombre.toLowerCase().includes(q))
     .sort((a, b) => b.total - a.total);
 
   const tbody = document.getElementById('tbody-financiero');
+
+  // Construir columnas de vendedores dinámicamente
+  const todosVendedores = Object.keys(porVendedor).sort();
+
+  // Actualizar thead dinámicamente
+  const thead = tbody.closest('table')?.querySelector('thead tr');
+  if (thead) {
+    thead.innerHTML = `
+      <th>Cliente</th><th>País</th><th>Compras</th><th>Botellas</th>
+      <th>Total Gastado</th><th>Costo Total</th><th>Ganancia Neta</th>
+      ${todosVendedores.map(v => `<th>Comisión ${esc(v)}</th>`).join('')}
+      <th>Última Compra</th>
+    `;
+  }
+
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">No hay historial de ventas registrado.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${7 + todosVendedores.length + 1}"><div class="empty-state">No hay historial de ventas registrado.</div></td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtradas.map(r => {
     const gananciaClass = r.ganancia >= 0 ? 'profit-positive' : 'profit-negative';
+    const comisionCols = todosVendedores.map(v => {
+      const vTotal = r.porVendedor[v] || 0;
+      return `<td style="font-weight:600;color:#16a34a">${vTotal > 0 ? '€ ' + (vTotal * pctPorVendedor(v)).toFixed(2) : '—'}</td>`;
+    }).join('');
     return `
       <tr>
         <td style="font-weight:600">${esc(r.nombre)}</td>
@@ -3285,6 +3408,7 @@ function renderFinanciero() {
         <td>€ ${r.total.toFixed(2)}</td>
         <td class="td-muted">€ ${r.costo.toFixed(2)}</td>
         <td class="${gananciaClass}">€ ${r.ganancia.toFixed(2)}</td>
+        ${comisionCols}
         <td class="td-muted">${esc(r.ultima || '—')}</td>
       </tr>
     `;
@@ -3979,7 +4103,7 @@ function editHistorial(clienteId, historialId) {
               <select class="edit-vino">
                 ${vinos.map(vino => `
                   <option value="${vino.id}" ${vino.id === v.vinoId ? 'selected' : ''}>
-                    ${vino.nombre}
+                    ${vino.nombre} (stock: ${vino.stock_actual ?? 0})
                   </option>
                 `).join('')}
               </select>
@@ -4285,11 +4409,11 @@ if (existingWineModal) {
           </div>
           <div class="form-group">
             <label>Stock inicial</label>
-            <input type="number" id="wv-stock-inicial" value="${vino?.stock_inicial || 0}">
+            <input type="number" id="wv-stock-inicial" value="${vino?.stock_inicial || 0}" style="-moz-appearance:textfield;" oninput="this.style.cssText">
           </div>
           <div class="form-group">
             <label>Stock actual</label>
-            <input type="number" id="wv-stock-actual" value="${vino?.stock_actual || 0}">
+            <input type="number" id="wv-stock-actual" value="${vino?.stock_actual || 0}" style="-moz-appearance:textfield;" oninput="this.style.cssText">
           </div>
           <div class="form-group full" id="wv-margen-preview" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:.75rem;">
             <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:.4rem;">Vista previa de margen</div>
@@ -4909,6 +5033,7 @@ window.toggleVinoActivo = toggleVinoActivo;
 // BACKUP — exportación manual + autobackup diario + label
 // ══════════════════════════════════════════════════════════════════════════════
 function exportBackup() {
+  // Backup manual: descarga el archivo
   const data = { clientes, vinos, ventas, exportado: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -4921,6 +5046,19 @@ function exportBackup() {
   updateBackupLabel();
 }
 window.exportBackup = exportBackup;
+
+function silentBackup() {
+  // Backup automático: guarda en localStorage sin diálogo de descarga
+  try {
+    const data = { clientes, vinos, ventas, exportado: new Date().toISOString() };
+    localStorage.setItem('crm_auto_backup', JSON.stringify(data));
+    localStorage.setItem('crm_last_backup', new Date().toISOString());
+    updateBackupLabel();
+    console.log('Auto-backup silencioso guardado:', new Date().toLocaleString('es-ES'));
+  } catch(e) {
+    console.error('Error en auto-backup:', e);
+  }
+}
 
 function updateBackupLabel() {
   const el = document.getElementById('last-backup-label');
@@ -4937,7 +5075,7 @@ function checkAutoBackup() {
     const hoy    = new Date().toISOString().slice(0, 10);
     const ultimo = ts ? ts.slice(0, 10) : null;
     if (ultimo !== hoy && (clientes.length > 0 || vinos.length > 0)) {
-      exportBackup();
+      silentBackup(); // silencioso, sin diálogo
     }
     updateBackupLabel();
   }, 1000);
