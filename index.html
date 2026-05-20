@@ -4060,45 +4060,46 @@ const entry = {
 }
 
 function editHistorial(clienteId, historialId) {
-
-  const cliente = clientes.find(
-    c => c.id === clienteId
-  );
-
+  const cliente = clientes.find(c => c.id === clienteId);
   if (!cliente) return;
 
-  const item = cliente.historial.find(
-    h => String(h.id) === String(historialId)
-  );
-
+  const item = cliente.historial.find(h => String(h.id) === String(historialId));
   if (!item) return;
 
   editingHistoryClienteId = clienteId;
   editingHistoryId = historialId;
 
-  document.getElementById('eh-fecha').value = item.fecha || '';
-  document.getElementById('eh-via').value = item.via || '';
-  document.getElementById('eh-nota').value = item.nota || '';
-  // Cargar próximo seguimiento del cliente
-  const clienteEh = clientes.find(c => c.id === clienteId);
-  document.getElementById('eh-proximo').value = clienteEh?.proximo || '';
+  // Llenar campos ANTES de abrir el modal
+  document.getElementById('eh-fecha').value   = item.fecha || '';
+  document.getElementById('eh-via').value     = item.via  || '';
+  document.getElementById('eh-nota').value    = item.nota || '';
+  document.getElementById('eh-proximo').value = cliente.proximo || '';
 
-  const winesContainer = document.getElementById('eh-wines');
+  // Setear tipo y actualizar visibilidad botón vino
+  const ehTipoEl = document.getElementById('eh-tipo');
+  ehTipoEl.value = item.tipoMovimiento || 'Venta';
+  const esComentario = ehTipoEl.value === 'Comentario / Seguimiento';
+  const addEditBtn   = document.querySelector('.add-edit-wine-btn');
+  const ehWines      = document.getElementById('eh-wines');
+  if (addEditBtn) addEditBtn.style.display = esComentario ? 'none' : '';
+  if (ehWines)    ehWines.style.display    = esComentario ? 'none' : '';
 
-  winesContainer.innerHTML = '';
+  // Listener para cambio de tipo
+  ehTipoEl.onchange = function() {
+    const esC = this.value === 'Comentario / Seguimiento';
+    if (addEditBtn) addEditBtn.style.display = esC ? 'none' : '';
+    if (ehWines)    ehWines.style.display    = esC ? 'none' : '';
+  };
 
+  // Llenar vinos
+  ehWines.innerHTML = '';
   if (item.ventas && item.ventas.length > 0) {
-
     item.ventas.forEach(v => {
-
-      winesContainer.insertAdjacentHTML('beforeend', `
+      ehWines.insertAdjacentHTML('beforeend', `
         <div class="edit-wine-line" style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-top:.75rem;">
-
           <div style="display:grid;grid-template-columns:2fr 1fr;gap:.6rem;">
-
             <div class="form-group">
               <label>Vino</label>
-
               <select class="edit-vino">
                 ${vinos.map(vino => `
                   <option value="${vino.id}" ${vino.id === v.vinoId ? 'selected' : ''}>
@@ -4107,56 +4108,23 @@ function editHistorial(clienteId, historialId) {
                 `).join('')}
               </select>
             </div>
-
             <div class="form-group">
               <label>Cantidad</label>
-
-              <input
-                type="number"
-                class="edit-cantidad"
-                value="${v.cantidad}"
-                min="1"
-              >
+              <input type="number" class="edit-cantidad" value="${v.cantidad}" min="1">
             </div>
-
           </div>
-
-          <button
-            type="button"
-            class="btn btn-ghost"
-            style="color:#b91c1c"
-            onclick="this.closest('.edit-wine-line').remove()"
-          >
+          <button type="button" class="btn btn-ghost" style="color:#b91c1c"
+            onclick="this.closest('.edit-wine-line').remove()">
             Eliminar vino
           </button>
-
         </div>
       `);
-
     });
-
   }
 
-  document.getElementById('edit-history-modal')
-    .classList.add('open');
-
-  document.getElementById('overlay')
-    .classList.add('open');
-
-  // Ocultar botón agregar vino si es Comentario / Seguimiento
-  const ehTipo = document.getElementById('eh-tipo').value;
-  const addEditBtn = document.querySelector('.add-edit-wine-btn');
-  const ehWines    = document.getElementById('eh-wines');
-  const esComentarioEdit = ehTipo === 'Comentario / Seguimiento';
-  if (addEditBtn) addEditBtn.style.display = esComentarioEdit ? 'none' : '';
-  if (ehWines)    ehWines.style.display    = esComentarioEdit ? 'none' : '';
-
-  // Actualizar cuando cambia el tipo
-  document.getElementById('eh-tipo').onchange = function() {
-    const esC = this.value === 'Comentario / Seguimiento';
-    if (addEditBtn) addEditBtn.style.display = esC ? 'none' : '';
-    if (ehWines)    ehWines.style.display    = esC ? 'none' : '';
-  };
+  // Abrir modal
+  document.getElementById('edit-history-modal').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
 }
 
 async function deleteHistorial(clienteId, historialId) {
