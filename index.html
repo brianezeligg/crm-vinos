@@ -2288,22 +2288,6 @@ transition:.2s;
     placeholder="https://..."
   >
 </div>
-      <div class="form-group">
-        <label>Estado</label>
-        <select id="f-estado">
-          <option value="">Seleccione…</option>
-          <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
-          <option>Cerrado</option><option>No interesa</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Último contacto</label>
-        <input type="date" id="f-fecha">
-      </div>
-      <div class="form-group">
-        <label>Próximo seguimiento</label>
-        <input type="date" id="f-proximo">
-      </div>
       <div class="form-group full">
         <label>Comentario / Respuesta</label>
         <textarea id="f-nota" rows="3" placeholder="Ej: Interesado en Malbec, pide muestra…"></textarea>
@@ -2377,6 +2361,7 @@ transition:.2s;
       <div class="form-group">
         <label>Tipo movimiento</label>
         <select id="eh-tipo">
+          <option>Comentario / Seguimiento</option>
           <option>Venta</option>
           <option>Consignación</option>
           <option>Devolución</option>
@@ -2400,12 +2385,17 @@ transition:.2s;
         <textarea id="eh-nota" rows="3"></textarea>
       </div>
 
+      <div class="form-group full">
+        <label>Actualizar próximo seguimiento (opcional)</label>
+        <input type="date" id="eh-proximo">
+      </div>
+
       <div class="full">
         <div id="eh-wines"></div>
 
         <button
           type="button"
-          class="btn btn-outline"
+          class="btn btn-outline add-edit-wine-btn"
           style="width:100%;margin-top:.5rem"
           onclick="addEditWineLine()"
         >
@@ -2817,7 +2807,9 @@ function renderTable() {
   const filtered = clientes.filter(c => {
     const empresa  = (c.empresa  || '').toLowerCase();
     const contacto = (c.contacto || '').toLowerCase();
-    const matchQ = !q || empresa.includes(q) || contacto.includes(q);
+    const tipo     = (c.tipo     || '').toLowerCase();
+    const email    = (c.email    || '').toLowerCase();
+    const matchQ = !q || empresa.includes(q) || contacto.includes(q) || tipo.includes(q) || email.includes(q);
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
     return matchQ && matchE && matchP;
@@ -3427,9 +3419,8 @@ function openModal(id) {
   document.getElementById('f-email').value     = c.email     || '';
   document.getElementById('f-direccion').value = c.direccion || '';
   document.getElementById('f-logo').value      = c.logo      || '';
-  document.getElementById('f-estado').value    = c.estado    || '';
-  document.getElementById('f-fecha').value     = c.fecha     || '';
-  document.getElementById('f-proximo').value   = c.proximo   || '';
+  // estado se cambia desde la ficha del cliente
+  // fecha y proximo se actualizan desde el historial de contactos
   document.getElementById('f-nota').value      = c.nota      || '';
   document.getElementById('f-private-notes') && (document.getElementById('f-private-notes').value = c.private_notes || '');
   document.getElementById('f-iban').value      = c.iban      || '';
@@ -3468,9 +3459,8 @@ async function saveCliente() {
       email:         document.getElementById('f-email').value.trim(),
       direccion:     document.getElementById('f-direccion').value.trim(),
       logo:          document.getElementById('f-logo').value.trim(),
-      estado:        document.getElementById('f-estado').value,
-      fecha:         document.getElementById('f-fecha').value,
-      proximo:       document.getElementById('f-proximo').value,
+      // estado se mantiene sin cambios (se cambia desde la ficha)
+      // fecha y proximo se mantienen sin cambios (se actualizan desde historial)
       nota:          document.getElementById('f-nota').value.trim(),
       private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
       iban:          document.getElementById('f-iban').value.trim(),
@@ -3646,6 +3636,16 @@ if (c.logo) {
         ${c.email ? `<div class="info-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a class="info-link" href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
         ${c.telefono ? `<a class="btn btn-primary" href="https://wa.me/${c.telefono.replace(/\D/g,'')}" target="_blank" style="margin-top:.8rem;width:100%;justify-content:center;text-decoration:none;">WhatsApp</a>` : ''}
         ${c.direccion ? `<div class="info-inline" style="margin-top:.6rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><a class="info-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.direccion)}" target="_blank">${esc(c.direccion)}</a></div>` : ''}
+        <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.75rem;display:flex;align-items:center;gap:.6rem;">
+          <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">ESTADO</label>
+          <select onchange="cambiarEstadoSheet('${c.id}', this.value)" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:.3rem .6rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);">
+            <option ${c.estado==='Nuevo'?'selected':''}>Nuevo</option>
+            <option ${c.estado==='Contactado'?'selected':''}>Contactado</option>
+            <option ${c.estado==='Interesado'?'selected':''}>Interesado</option>
+            <option ${c.estado==='Cerrado'?'selected':''}>Cerrado</option>
+            <option ${c.estado==='No interesa'?'selected':''}>No interesa</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -3804,6 +3804,7 @@ if (c.logo) {
       <div class="form-group">
         <label>Tipo movimiento</label>
         <select id="nc-tipo-movimiento" onchange="updateTipoMovInfo()">
+          <option>Comentario / Seguimiento</option>
           <option>Venta</option>
           <option>Consignación</option>
           <option>Devolución</option>
@@ -3833,7 +3834,7 @@ if (c.logo) {
 
       <div id="wine-lines"></div>
 
-      <button type="button" class="btn btn-outline" style="width:100%;margin-top:.5rem" onclick="addWineLine()">
+      <button type="button" class="btn btn-outline add-wine-btn" style="width:100%;margin-top:.5rem" onclick="addWineLine()">
         + Agregar vino
       </button>
 
@@ -3854,6 +3855,8 @@ if (c.logo) {
 
   document.getElementById('sheet').classList.add('open');
   syncOverlay();
+  // Sincronizar visibilidad del botón agregar vino según tipo seleccionado
+  setTimeout(updateTipoMovInfo, 0);
 }
 
 function closeSheet() {
@@ -4076,6 +4079,9 @@ function editHistorial(clienteId, historialId) {
   document.getElementById('eh-fecha').value = item.fecha || '';
   document.getElementById('eh-via').value = item.via || '';
   document.getElementById('eh-nota').value = item.nota || '';
+  // Cargar próximo seguimiento del cliente
+  const clienteEh = clientes.find(c => c.id === clienteId);
+  document.getElementById('eh-proximo').value = clienteEh?.proximo || '';
 
   const winesContainer = document.getElementById('eh-wines');
 
@@ -4136,6 +4142,21 @@ function editHistorial(clienteId, historialId) {
 
   document.getElementById('overlay')
     .classList.add('open');
+
+  // Ocultar botón agregar vino si es Comentario / Seguimiento
+  const ehTipo = document.getElementById('eh-tipo').value;
+  const addEditBtn = document.querySelector('.add-edit-wine-btn');
+  const ehWines    = document.getElementById('eh-wines');
+  const esComentarioEdit = ehTipo === 'Comentario / Seguimiento';
+  if (addEditBtn) addEditBtn.style.display = esComentarioEdit ? 'none' : '';
+  if (ehWines)    ehWines.style.display    = esComentarioEdit ? 'none' : '';
+
+  // Actualizar cuando cambia el tipo
+  document.getElementById('eh-tipo').onchange = function() {
+    const esC = this.value === 'Comentario / Seguimiento';
+    if (addEditBtn) addEditBtn.style.display = esC ? 'none' : '';
+    if (ehWines)    ehWines.style.display    = esC ? 'none' : '';
+  };
 }
 
 async function deleteHistorial(clienteId, historialId) {
@@ -4275,9 +4296,18 @@ function removeWineLine(btn) {
 function updateTipoMovInfo() {
   const tipoEl = document.getElementById('nc-tipo-movimiento');
   const infoEl = document.getElementById('tipo-mov-info');
+  const addWineBtn = document.querySelector('.add-wine-btn');
+  const wineLines  = document.getElementById('wine-lines');
   if (!tipoEl || !infoEl) return;
   const tipo = tipoEl.value;
+  const esComentario = tipo === 'Comentario / Seguimiento';
+
+  // Ocultar/mostrar sección de vinos
+  if (addWineBtn) addWineBtn.style.display = esComentario ? 'none' : '';
+  if (wineLines)  wineLines.style.display  = esComentario ? 'none' : '';
+
   const map = {
+    'Comentario / Seguimiento': { msg: '💬 Solo registro · SIN stock · SIN factura', bg:'#f8fafc', color:'#475569' },
     'Venta':        { msg: '✅ Baja stock · Factura · Suma ganancia', bg:'#f0fdf4', color:'#166534' },
     'Consignación': { msg: '📦 Baja stock · SIN factura · SIN ganancia (queda pendiente de cierre)', bg:'#ede9fe', color:'#5b21b6' },
     'Devolución':   { msg: '↩️ Sube stock · Resta facturación · Resta ganancia', bg:'#e0f2fe', color:'#075985' },
@@ -4293,7 +4323,6 @@ function updateTipoMovInfo() {
   } else {
     infoEl.style.display = 'none';
   }
-  // Refresh all wine line calculations
   document.querySelectorAll('.wine-line').forEach(line => {
     const sel = line.querySelector('.wine-vino');
     if (sel) updateWineInfo(sel);
@@ -4963,11 +4992,15 @@ async function saveEditedHistory() {
     return h;
   });
 
+  const updateData = { historial: historialActualizado };
+
+  // Si se especificó próximo seguimiento, actualizarlo
+  const ehProximo = document.getElementById('eh-proximo').value;
+  if (ehProximo) updateData.proximo = ehProximo;
+
   const { error } = await supabase
     .from('clientes')
-    .update({
-      historial: historialActualizado
-    })
+    .update(updateData)
     .eq('id', cliente.id);
 
   if (error) {
@@ -4988,7 +5021,15 @@ async function saveEditedHistory() {
   openSheet(cliente.id);
 }
 
-window.renderTable      = renderTable;
+async function cambiarEstadoSheet(clienteId, nuevoEstado) {
+  const { error } = await supabase.from('clientes').update({ estado: nuevoEstado }).eq('id', clienteId);
+  if (error) { console.error(error); alert('Error actualizando estado'); return; }
+  await loadClientes();
+  openSheet(clienteId);
+}
+window.cambiarEstadoSheet = cambiarEstadoSheet;
+
+
 window.renderFinanciero = renderFinanciero;
 window.openModal        = openModal;
 window.closeModal       = closeModal;
