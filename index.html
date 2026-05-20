@@ -3535,7 +3535,7 @@ if (c.logo) {
   // Historial con ventas y ganancias
   const histHTML = (c.historial && c.historial.length > 0)
     ? `<div class="historial-list">
-        ${c.historial.map(h => {
+        ${[...(c.historial || [])].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map(h => {
           const tieneVentas = h.ventas && h.ventas.length > 0;
           const tipoH = (h.tipoMovimiento || 'Venta').trim();
           const esFacturableH = tipoH === 'Venta';
