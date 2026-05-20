@@ -1988,7 +1988,7 @@ transition:.2s;
       </select>
       <select id="filterPais">
         <option value="">Todos los países</option>
-        <option>Luxemburgo</option><option>Bélgica</option><option>Francia</option>
+        <option>Luxemburgo</option><option>Bélgica</option><option>Alemania</option><option>Francia</option>
       </select>
     </div>
     <div class="toolbar-actions">
@@ -2260,7 +2260,7 @@ transition:.2s;
         <label>País</label>
         <select id="f-pais">
           <option value="">Seleccione…</option>
-          <option>Luxemburgo</option><option>Bélgica</option><option>Francia</option>
+          <option>Luxemburgo</option><option>Bélgica</option><option>Alemania</option><option>Francia</option>
         </select>
       </div>
       <div class="form-group">
@@ -4654,7 +4654,15 @@ function renderCharts() {
   if (chartPais) chartPais.destroy();
   chartPais = new Chart(document.getElementById('chart-pais'), {
     type: 'doughnut',
-    data: { labels: Object.keys(paisCounts), datasets: [{ data: Object.values(paisCounts), backgroundColor: ['#7B1F3A','#C45C7A','#E8A0B0'], hoverOffset: 6 }] },
+    data: { labels: Object.keys(paisCounts), datasets: [{ data: Object.values(paisCounts), 
+backgroundColor: [
+  '#7B1F3A', // bordó
+  '#2563EB', // azul
+  '#16A34A', // verde
+  '#F59E0B', // naranja
+  '#9333EA', // violeta
+  '#EC4899'  // rosa
+] , hoverOffset: 6 }] },
     options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { font: { family: font }, color: textColor, padding: 14 } } } }
   });
 
