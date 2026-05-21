@@ -4191,10 +4191,37 @@ async function deleteHistorial(clienteId, historialId) {
     h => String(h.id) !== String(historialId)
   );
 
-  const { error } = await supabase
-    .from('clientes')
-    .update({ historial: nuevoHistorial })
-    .eq('id', clienteId);
+ const updateData = {
+  historial: nuevoHistorial
+};
+
+// Si no queda historial, limpiar seguimiento y último contacto
+if (nuevoHistorial.length === 0) {
+
+  updateData.proximo = null;
+  updateData.fecha   = null;
+  updateData.via     = null;
+  updateData.nota    = null;
+
+} else {
+
+  // Buscar el contacto más reciente restante
+  const ultimo = [...nuevoHistorial]
+    .sort((a, b) =>
+      new Date(b.timestamp || b.fecha || 0) -
+      new Date(a.timestamp || a.fecha || 0)
+    )[0];
+
+  updateData.fecha = ultimo.fecha || null;
+  updateData.via   = ultimo.via   || null;
+  updateData.nota  = ultimo.nota  || null;
+
+}
+
+const { error } = await supabase
+  .from('clientes')
+  .update(updateData)
+  .eq('id', clienteId);
 
   if (error) {
     console.error(error);
@@ -4963,8 +4990,10 @@ async function saveEditedHistory() {
   const updateData = { historial: historialActualizado };
 
   // Si se especificó próximo seguimiento, actualizarlo
-  const ehProximo = document.getElementById('eh-proximo').value;
-  if (ehProximo) updateData.proximo = ehProximo;
+ const ehProximo = document.getElementById('eh-proximo').value;
+
+// Permitir borrar el próximo seguimiento
+updateData.proximo = ehProximo || null;
 
   const { error } = await supabase
     .from('clientes')
