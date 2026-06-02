@@ -644,14 +644,17 @@ header {
 
 /* ── TABLE COLUMN WIDTHS (desktop) — solo tabla clientes ── */
 #table-clientes { table-layout: fixed; width: 100%; }
-#table-clientes thead th:nth-child(1)  { width: 22%; } /* Empresa */
-#table-clientes thead th:nth-child(2)  { width: 11%; } /* Tipo */
-#table-clientes thead th:nth-child(3)  { width: 11%; } /* País */
-#table-clientes thead th:nth-child(4)  { width: 12%; } /* Estado */
-#table-clientes thead th:nth-child(5)  { width: 12%; } /* Consignación */
-#table-clientes thead th:nth-child(6)  { width: 12%; } /* Prioridad */
-#table-clientes thead th:nth-child(7)  { width: 12%; } /* Último cont. */
-#table-clientes thead th:nth-child(8)  { width: 8%;  } /* Acc. */
+#table-clientes thead th { padding: .6rem .5rem; font-size: .62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#table-clientes tbody td { padding: .65rem .5rem; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#table-clientes thead th:nth-child(1)  { width: 20%; } /* Empresa */
+#table-clientes thead th:nth-child(2)  { width: 9%;  } /* Tipo */
+#table-clientes thead th:nth-child(3)  { width: 9%;  } /* País */
+#table-clientes thead th:nth-child(4)  { width: 9%;  } /* Ciudad */
+#table-clientes thead th:nth-child(5)  { width: 10%; } /* Estado */
+#table-clientes thead th:nth-child(6)  { width: 10%; } /* Consignación */
+#table-clientes thead th:nth-child(7)  { width: 10%; } /* Prioridad */
+#table-clientes thead th:nth-child(8)  { width: 10%; } /* Próx. seguimiento */
+#table-clientes thead th:nth-child(9)  { width: 7%;  } /* Acc. */
 .td-empresa { overflow: hidden; }
 
 @media (max-width: 640px) {
@@ -2015,7 +2018,7 @@ transition:.2s;
     <table id="table-clientes">
       <thead>
         <tr>
-          <th>Empresa</th><th>Tipo</th><th>País</th>
+          <th>Empresa</th><th>Tipo</th><th>País</th><th>Ciudad</th>
           <th>Estado</th><th>Consignación</th><th>Prioridad</th><th>Próx. seguimiento</th><th>Acc.</th>
         </tr>
       </thead>
@@ -2144,6 +2147,14 @@ transition:.2s;
       <div class="chart-title">Facturación mensual — últimos 6 meses</div>
       <div class="chart-wrap" style="height:220px"><canvas id="chart-actividad"></canvas></div>
     </div>
+    <div class="chart-card chart-full">
+      <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>📍 Mapa de Clientes</span>
+        <button onclick="window.limpiarYRecargarMapa()" style="font-size:.75rem;padding:.2rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary);cursor:pointer;color:var(--text-muted);">🔄 Recargar</button>
+      </div>
+      <div id="mapa-clientes" style="height:450px;border-radius:10px;z-index:1;position:relative;margin-top:.5rem;"></div>
+      <div id="mapa-status" style="font-size:.78rem;color:var(--text-muted);margin-top:.4rem;text-align:center;"></div>
+    </div>
   </div>
 </div>
 
@@ -2262,6 +2273,10 @@ transition:.2s;
           <option value="">Seleccione…</option>
           <option>Luxemburgo</option><option>Bélgica</option><option>Alemania</option><option>Francia</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>Ciudad / Localidad</label>
+        <input type="text" id="f-ciudad" placeholder="Ej: Luxembourg, Liège, Metz…">
       </div>
       <div class="form-group">
         <label>Persona de contacto</label>
@@ -2898,6 +2913,7 @@ return `
 
           <td data-col="tipo" class="td-muted">${esc(c.tipo)}</td>
           <td data-col="pais" class="td-muted">${esc(c.pais)}</td>
+          <td data-col="ciudad" class="td-muted">${esc(c.ciudad || '—')}</td>
 
           <td data-col="estado">${stateBadge(c.estado)}</td>
 
@@ -3414,6 +3430,7 @@ function openModal(id) {
   document.getElementById('f-empresa').value   = c.empresa   || '';
   document.getElementById('f-tipo').value      = c.tipo      || '';
   document.getElementById('f-pais').value      = c.pais      || '';
+  document.getElementById('f-ciudad').value    = c.ciudad    || '';
   document.getElementById('f-contacto').value  = c.contacto  || '';
   document.getElementById('f-telefono').value  = c.telefono  || '';
   document.getElementById('f-email').value     = c.email     || '';
@@ -3454,6 +3471,7 @@ async function saveCliente() {
       empresa,
       tipo:          document.getElementById('f-tipo').value,
       pais:          document.getElementById('f-pais').value,
+      ciudad:        document.getElementById('f-ciudad').value.trim(),
       contacto:      document.getElementById('f-contacto').value.trim(),
       telefono:      document.getElementById('f-telefono').value.trim(),
       email:         document.getElementById('f-email').value.trim(),
@@ -3470,7 +3488,7 @@ async function saveCliente() {
     if (editingId) {
       ({ error } = await supabase.from('clientes').update(c).eq('id', editingId));
     } else {
-      ({ error } = await supabase.from('clientes').insert([{ ...c, historial: [] }]));
+      ({ error } = await supabase.from('clientes').insert([{ ...c, estado: c.estado || 'Nuevo', historial: [] }]));
     }
 
     if (error) {
@@ -4758,6 +4776,91 @@ backgroundColor: [
     data: { labels: last6.map(m=>m.label), datasets: [{ label: 'Facturación', data: last6.map(m=>totals[m.key]||0), backgroundColor: '#7B1F3A', borderRadius }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` € ${Number(ctx.raw).toFixed(2)}` } } }, scales: { x: { grid: { display: false }, ticks: { font: { family: font }, color: textColor } }, y: { grid: { color: gridColor }, ticks: { font: { family: font }, color: textColor, callback: v => '€ ' + v }, beginAtZero: true } } }
   });
+  setTimeout(() => renderMapa().catch(() => {}), 300);
+}
+
+// ── MAPA DE CLIENTES ──────────────────────────────────────────────────────────
+let mapaInstance = null;
+let geocodeCache = {};
+try { geocodeCache = JSON.parse(localStorage.getItem('crm_geocache') || '{}'); } catch(e) {}
+
+window.limpiarYRecargarMapa = function() {
+  geocodeCache = {};
+  try { localStorage.removeItem('crm_geocache'); } catch(e) {}
+  if (window.L && mapaInstance) {
+    mapaInstance.eachLayer(l => { if (l instanceof L.Marker) mapaInstance.removeLayer(l); });
+  }
+  renderMapa().catch(() => {});
+};
+
+async function cargarLeaflet() {
+  if (window.L) return true;
+  return new Promise(resolve => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function geocodeDir(dir) {
+  if (geocodeCache[dir]) return geocodeCache[dir];
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7000);
+    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(dir)}&limit=1`, { signal: ctrl.signal });
+    clearTimeout(t);
+    const d = await res.json();
+    if (d?.features?.[0]) {
+      const [lng, lat] = d.features[0].geometry.coordinates;
+      const coords = { lat, lng };
+      geocodeCache[dir] = coords;
+      try { localStorage.setItem('crm_geocache', JSON.stringify(geocodeCache)); } catch(e) {}
+      return coords;
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function renderMapa() {
+  const el = document.getElementById('mapa-clientes');
+  const st = document.getElementById('mapa-status');
+  if (!el) return;
+  const ok = await cargarLeaflet();
+  if (!ok) { if (st) st.textContent = 'Mapa no disponible (sin conexión).'; return; }
+  if (!mapaInstance) {
+    mapaInstance = L.map('mapa-clientes').setView([49.8, 6.1], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapaInstance);
+  } else {
+    mapaInstance.eachLayer(l => { if (l instanceof L.Marker) mapaInstance.removeLayer(l); });
+  }
+  const conDir = clientes.filter(c => c.direccion?.trim());
+  if (!conDir.length) { if (st) st.textContent = 'Ningún cliente tiene dirección cargada.'; return; }
+  const colores = { 'Nuevo':'#6b7280','Contactado':'#2563eb','Interesado':'#d97706','Cerrado':'#16a34a','No interesa':'#dc2626' };
+  const bounds = []; let geo = 0;
+  if (st) st.textContent = `Geocodificando ${conDir.length} clientes...`;
+  for (const c of conDir) {
+    const coords = await geocodeDir(c.direccion);
+    if (!coords) continue;
+    geo++; bounds.push([coords.lat, coords.lng]);
+    const color = colores[c.estado] || '#7B1F3A';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.3)">${esc(c.empresa||'?').slice(0,2).toUpperCase()}</div>`,
+      iconSize:[30,30], iconAnchor:[15,15]
+    });
+    L.marker([coords.lat,coords.lng],{icon}).addTo(mapaInstance)
+      .bindPopup(`<strong>${esc(c.empresa||'—')}</strong><br>${esc(c.tipo||'')} · ${esc(c.ciudad||c.pais||'')}<br><span style="color:${color};font-weight:600">${esc(c.estado||'')}</span><br><small>${esc(c.direccion)}</small>`);
+    if (st) st.textContent = `Cargando... ${geo}/${conDir.length}`;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  if (bounds.length) mapaInstance.fitBounds(bounds, { padding:[30,30] });
+  if (st) st.textContent = geo ? `${geo} cliente(s) · ⬜Nuevo 🔵Contactado 🟠Interesado 🟢Cerrado 🔴No interesa` : 'No se pudieron ubicar las direcciones.';
 }
 
 function syncOverlay() {
