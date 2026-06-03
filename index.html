@@ -2451,26 +2451,45 @@ supabase.auth.onAuthStateChange(() => { checkAuth(); });
 
 
 async function checkAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
+
+  const { data: { session } } =
+    await supabase.auth.getSession();
+
   if (session) {
-const nombre =
-  session.user.user_metadata?.nombre ||
-  session.user.email;
 
-const userBox = document.getElementById('logged-user');
+    const nombre =
+      session.user.user_metadata?.nombre ||
+      session.user.email;
 
-if (userBox) {
-  userBox.textContent = `👤 ${nombre}`;
-}
+    const userBox =
+      document.getElementById('logged-user');
+
+    if (userBox) {
+      userBox.textContent = `👤 ${nombre}`;
+    }
+
+    // GUARDAR ÚLTIMA ACTIVIDAD
+
+    await supabase
+      .from('user_activity')
+      .upsert({
+        user_id: session.user.id,
+        email: session.user.email,
+        last_seen: new Date().toISOString()
+      });
+
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+
     await loadClientes();
     await loadVinos();
     await loadVentas();
-    checkAutoBackup();
+
   } else {
+
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
+
   }
 }
 
