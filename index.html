@@ -4846,6 +4846,15 @@ async function geocodeDir(dir) {
   return null;
 }
 
+// Devuelve la mejor query de geocodificación disponible para un cliente
+function geoQueryCliente(c) {
+  const dir = c.direccion?.trim();
+  if (dir) return { query: dir, esDireccion: true };
+  const partes = [c.ciudad?.trim(), c.pais?.trim()].filter(Boolean);
+  if (partes.length) return { query: partes.join(', '), esDireccion: false };
+  return null;
+}
+
 async function renderMapa() {
   const el = document.getElementById('mapa-clientes');
   const st = document.getElementById('mapa-status');
@@ -4858,28 +4867,55 @@ async function renderMapa() {
   } else {
     mapaInstance.eachLayer(l => { if (l instanceof L.Marker) mapaInstance.removeLayer(l); });
   }
-  const conDir = clientes.filter(c => c.direccion?.trim());
-  if (!conDir.length) { if (st) st.textContent = 'Ningún cliente tiene dirección cargada.'; return; }
+  // Incluir todos los clientes que tengan al menos ciudad o país
+  const todosCandidatos = clientes.map(c => ({ c, geo: geoQueryCliente(c) })).filter(x => x.geo);
+  const sinNada = clientes.filter(c => !geoQueryCliente(c));
+  if (!todosCandidatos.length) {
+    if (st) st.textContent = 'Ningún cliente tiene dirección, ciudad ni país cargado.';
+    return;
+  }
   const colores = { 'Nuevo':'#6b7280','Contactado':'#2563eb','Interesado':'#d97706','Cerrado':'#16a34a','No interesa':'#dc2626' };
   const bounds = []; let geo = 0;
-  if (st) st.textContent = `Geocodificando ${conDir.length} clientes...`;
-  for (const c of conDir) {
-    const coords = await geocodeDir(c.direccion);
-    if (!coords) continue;
-    geo++; bounds.push([coords.lat, coords.lng]);
-    const color = colores[c.estado] || '#7B1F3A';
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.3)">${esc(c.empresa||'?').slice(0,2).toUpperCase()}</div>`,
-      iconSize:[30,30], iconAnchor:[15,15]
-    });
-    L.marker([coords.lat,coords.lng],{icon}).addTo(mapaInstance)
-      .bindPopup(`<strong>${esc(c.empresa||'—')}</strong><br>${esc(c.tipo||'')} · ${esc(c.ciudad||c.pais||'')}<br><span style="color:${color};font-weight:600">${esc(c.estado||'')}</span><br><small>${esc(c.direccion)}</small>`);
-    if (st) st.textContent = `Cargando... ${geo}/${conDir.length}`;
-    await new Promise(r => setTimeout(r, 300));
+  const fallidos = [];
+  if (st) st.textContent = `Geocodificando ${todosCandidatos.length} clientes...`;
+
+  // Geocodificar en paralelo en lotes de 5 para no saturar la API
+  const BATCH = 5;
+  for (let i = 0; i < todosCandidatos.length; i += BATCH) {
+    const lote = todosCandidatos.slice(i, i + BATCH);
+    const resultados = await Promise.all(lote.map(({ geo }) => geocodeDir(geo.query)));
+    for (let j = 0; j < lote.length; j++) {
+      const { c, geo: geoInfo } = lote[j];
+      const coords = resultados[j];
+      if (!coords) { fallidos.push(c.empresa); continue; }
+      geo++; bounds.push([coords.lat, coords.lng]);
+      const color = colores[c.estado] || '#7B1F3A';
+      // Borde punteado si se ubicó por ciudad/país (no dirección exacta)
+      const borderStyle = geoInfo.esDireccion
+        ? '2px solid #fff'
+        : '2px dashed #fff';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:${borderStyle};box-shadow:0 2px 5px rgba(0,0,0,.3);opacity:${geoInfo.esDireccion ? 1 : 0.75}">${esc(c.empresa||'?').slice(0,2).toUpperCase()}</div>`,
+        iconSize:[30,30], iconAnchor:[15,15]
+      });
+      const ubicadoPor = geoInfo.esDireccion ? esc(c.direccion) : `📍 aprox. ${esc(geoInfo.query)}`;
+      L.marker([coords.lat,coords.lng],{icon}).addTo(mapaInstance)
+        .bindPopup(`<strong>${esc(c.empresa||'—')}</strong><br>${esc(c.tipo||'')} · ${esc(c.ciudad||c.pais||'')}<br><span style="color:${color};font-weight:600">${esc(c.estado||'')}</span><br><small>${ubicadoPor}</small>`);
+    }
+    if (st) st.textContent = `Cargando... ${Math.min(i + BATCH, todosCandidatos.length)}/${todosCandidatos.length}`;
   }
   if (bounds.length) mapaInstance.fitBounds(bounds, { padding:[30,30] });
-  if (st) st.textContent = geo ? `${geo} cliente(s) · ⬜Nuevo 🔵Contactado 🟠Interesado 🟢Cerrado 🔴No interesa` : 'No se pudieron ubicar las direcciones.';
+  if (st) {
+    let msg = geo
+      ? `${geo} cliente(s) en mapa · ⬜Nuevo 🔵Contactado 🟠Interesado 🟢Cerrado 🔴No interesa · borde punteado = ubicación aproximada`
+      : 'No se pudieron ubicar las direcciones.';
+    if (fallidos.length)
+      msg += ` | ⚠️ Sin ubicar: ${fallidos.join(', ')}`;
+    if (sinNada.length)
+      msg += ` | 📋 Sin datos de ubicación: ${sinNada.map(c=>c.empresa).join(', ')}`;
+    st.textContent = msg;
+  }
 }
 
 function syncOverlay() {
