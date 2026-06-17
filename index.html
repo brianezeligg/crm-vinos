@@ -5593,10 +5593,34 @@ document.addEventListener('change', async (e) => {
 
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
-let calEventos = JSON.parse(localStorage.getItem('crm_calendar_events') || '[]');
+let calEventos = [];
 let editingCalId = null;
 let calSelectedDate = null;
 let calMesFiltro = 'todos';
+
+async function loadCalEvents() {
+  try {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .order('fecha', { ascending: true });
+    if (error) throw error;
+    calEventos = (data || []).map(e => ({
+      id:            e.id,
+      titulo:        e.titulo,
+      fecha:         e.fecha,
+      hora:          e.hora || '',
+      tipo:          e.tipo || 'reunion',
+      clienteId:     e.clienteId || '',
+      clienteNombre: e.clienteNombre || '',
+      nota:          e.nota || ''
+    }));
+  } catch(err) {
+    console.error('Error cargando eventos del calendario:', err);
+    calEventos = [];
+  }
+  renderCalendario();
+}
 
 const CAL_COLORS = {
   reunion: '#7B1F3A',
@@ -5608,8 +5632,19 @@ const CAL_TIPO_LABEL = {
   reunion:'Reunión', llamada:'Llamada', email:'Email', otro:'Otro'
 };
 
-function saveCalStorage() {
-  localStorage.setItem('crm_calendar_events', JSON.stringify(calEventos));
+async function saveCalStorage(evento, deleteId) {
+  try {
+    if (deleteId) {
+      const { error } = await supabase.from('calendar_events').delete().eq('id', deleteId);
+      if (error) throw error;
+    } else if (evento) {
+      const { error } = await supabase.from('calendar_events').upsert([evento], { onConflict: 'id' });
+      if (error) throw error;
+    }
+  } catch(err) {
+    console.error('Error guardando evento:', err);
+    alert('Error al guardar el evento. Revisá la conexión.');
+  }
 }
 
 function calGoToday() {
@@ -5900,7 +5935,7 @@ function closeCalModal() {
   document.getElementById('overlay').classList.remove('open');
 }
 
-function saveCalEvent() {
+async function saveCalEvent() {
   const titulo = document.getElementById('cal-f-titulo').value.trim();
   const fecha  = document.getElementById('cal-f-fecha').value;
   if (!titulo || !fecha) { alert('Completá el título y la fecha.'); return; }
@@ -5910,37 +5945,30 @@ function saveCalEvent() {
     ? (clientes.find(c => c.id === clienteId)?.empresa || '')
     : '';
 
+  const evento = {
+    id:            editingCalId || Date.now().toString(),
+    titulo, fecha,
+    hora:          document.getElementById('cal-f-hora').value,
+    tipo:          document.getElementById('cal-f-tipo').value,
+    clienteId,     clienteNombre,
+    nota:          document.getElementById('cal-f-nota').value.trim()
+  };
+
+  // Actualizar array local
   if (editingCalId) {
     const idx = calEventos.findIndex(e => e.id === editingCalId);
-    if (idx !== -1) {
-      calEventos[idx] = {
-        ...calEventos[idx],
-        titulo, fecha,
-        hora:         document.getElementById('cal-f-hora').value,
-        tipo:         document.getElementById('cal-f-tipo').value,
-        clienteId, clienteNombre,
-        nota:         document.getElementById('cal-f-nota').value.trim()
-      };
-    }
+    if (idx !== -1) calEventos[idx] = evento;
   } else {
-    calEventos.push({
-      id: Date.now().toString(),
-      titulo, fecha,
-      hora:         document.getElementById('cal-f-hora').value,
-      tipo:         document.getElementById('cal-f-tipo').value,
-      clienteId, clienteNombre,
-      nota:         document.getElementById('cal-f-nota').value.trim()
-    });
+    calEventos.push(evento);
   }
 
   // Si el evento guardado es del día seleccionado, actualizar panel
-  const savedFecha = document.getElementById('cal-f-fecha').value;
-  if (calSelectedDate === savedFecha || !calSelectedDate) calSelectedDate = savedFecha;
+  if (calSelectedDate === fecha || !calSelectedDate) calSelectedDate = fecha;
 
-  saveCalStorage();
+  await saveCalStorage(evento, null);
   closeCalModal();
   // Cambiar mes si el evento guardado es de otro mes
-  const [fy, fm] = savedFecha.split('-').map(Number);
+  const [fy, fm] = fecha.split('-').map(Number);
   calYear = fy; calMonth = fm - 1;
   renderCalendario();
 }
