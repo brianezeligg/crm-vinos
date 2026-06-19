@@ -5787,7 +5787,7 @@ function renderCalendario() {
     dayEvents.slice(0,3).forEach(ev => {
       const dot = document.createElement('div');
       dot.className = 'cal-event-dot' + (isPast ? ' past-ev' : '');
-      dot.innerHTML = `<span class="dot" style="background:${CAL_COLORS[ev.tipo]||'#888'}"></span><span style="overflow:hidden;text-overflow:ellipsis;">${ev.titulo}</span>`;
+      dot.innerHTML = `<span class="dot" style="background:${CAL_COLORS[ev.tipo]||'#888'}"></span><span style="overflow:hidden;text-overflow:ellipsis;">${ev.titulo}${ev.hora ? ' <span style="opacity:.7;font-size:.6rem;white-space:nowrap;">– ' + ev.hora + ' h</span>' : ''}</span>`;
       dot.onclick = (e) => { e.stopPropagation(); openCalModal(ev.id); };
       cell.appendChild(dot);
     });
