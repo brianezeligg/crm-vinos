@@ -2756,6 +2756,8 @@ async function checkAuth() {
     await loadClientes();
     await loadVinos();
     await loadVentas();
+    await loadCalEventos();
+    checkAutoBackup();
 
   } else {
 
@@ -5513,7 +5515,7 @@ function exportBackup() {
   const ahora = new Date();
   const fecha = ahora.toISOString().slice(0,10);
   const hora  = ahora.toTimeString().slice(0,8).replace(/:/g,'-');
-  const data  = { clientes, vinos, ventas, exportado: ahora.toISOString() };
+  const data  = { clientes, vinos, ventas, calEventos, exportado: ahora.toISOString() };
   const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url   = URL.createObjectURL(blob);
   const a     = document.createElement('a');
@@ -5529,7 +5531,7 @@ window.exportBackup = exportBackup;
 function silentBackup() {
   try {
     const ahora   = new Date();
-    const data    = { clientes, vinos, ventas, exportado: ahora.toISOString() };
+    const data    = { clientes, vinos, ventas, calEventos, exportado: ahora.toISOString() };
     const jsonStr = JSON.stringify(data, null, 2);
 
     // Si corre en Electron, guarda directo a la carpeta backup/
@@ -5598,30 +5600,6 @@ let editingCalId = null;
 let calSelectedDate = null;
 let calMesFiltro = 'todos';
 
-async function loadCalEvents() {
-  try {
-    const { data, error } = await supabase
-      .from('calendar_events')
-      .select('*')
-      .order('fecha', { ascending: true });
-    if (error) throw error;
-    calEventos = (data || []).map(e => ({
-      id:            e.id,
-      titulo:        e.titulo,
-      fecha:         e.fecha,
-      hora:          e.hora || '',
-      tipo:          e.tipo || 'reunion',
-      clienteId:     e.clienteId || '',
-      clienteNombre: e.clienteNombre || '',
-      nota:          e.nota || ''
-    }));
-  } catch(err) {
-    console.error('Error cargando eventos del calendario:', err);
-    calEventos = [];
-  }
-  renderCalendario();
-}
-
 const CAL_COLORS = {
   reunion: '#7B1F3A',
   llamada: '#2563eb',
@@ -5632,19 +5610,74 @@ const CAL_TIPO_LABEL = {
   reunion:'Reunión', llamada:'Llamada', email:'Email', otro:'Otro'
 };
 
-async function saveCalStorage(evento, deleteId) {
-  try {
-    if (deleteId) {
-      const { error } = await supabase.from('calendar_events').delete().eq('id', deleteId);
-      if (error) throw error;
-    } else if (evento) {
-      const { error } = await supabase.from('calendar_events').upsert([evento], { onConflict: 'id' });
-      if (error) throw error;
-    }
-  } catch(err) {
-    console.error('Error guardando evento:', err);
-    alert('Error al guardar el evento. Revisá la conexión.');
+// ── Guardar/eliminar/cargar eventos en Supabase ───────────────────────────────
+async function saveCalEventoSupabase(ev) {
+  const { error } = await supabase.from('calendar_events').upsert({
+    id:             ev.id,
+    titulo:         ev.titulo,
+    fecha:          ev.fecha,
+    hora:           ev.hora || null,
+    tipo:           ev.tipo || 'reunion',
+    cliente_id:     ev.clienteId || null,
+    cliente_nombre: ev.clienteNombre || null,
+    nota:           ev.nota || null
+  });
+  if (error) console.error('Error guardando evento calendario:', error);
+}
+
+async function deleteCalEventoSupabase(id) {
+  const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+  if (error) console.error('Error eliminando evento calendario:', error);
+}
+
+async function loadCalEventos() {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .order('fecha', { ascending: true });
+  if (error) { console.error('Error cargando eventos calendario:', error); return; }
+
+  calEventos = (data || []).map(r => ({
+    id:            r.id,
+    titulo:        r.titulo,
+    fecha:         r.fecha,
+    hora:          r.hora || '',
+    tipo:          r.tipo || 'reunion',
+    clienteId:     r.cliente_id || '',
+    clienteNombre: r.cliente_nombre || '',
+    nota:          r.nota || ''
+  }));
+
+  // Migración única desde localStorage si hay datos
+  const legacy = localStorage.getItem('crm_calendar_events');
+  if (legacy) {
+    try {
+      const legacyEvents = JSON.parse(legacy);
+      if (legacyEvents && legacyEvents.length > 0) {
+        console.log('Migrando ' + legacyEvents.length + ' eventos del calendario a Supabase...');
+        for (const ev of legacyEvents) {
+          if (!calEventos.find(e => e.id === ev.id)) {
+            await saveCalEventoSupabase(ev);
+          }
+        }
+        const { data: fresh } = await supabase.from('calendar_events').select('*').order('fecha', { ascending: true });
+        calEventos = (fresh || []).map(r => ({
+          id:            r.id,
+          titulo:        r.titulo,
+          fecha:         r.fecha,
+          hora:          r.hora || '',
+          tipo:          r.tipo || 'reunion',
+          clienteId:     r.cliente_id || '',
+          clienteNombre: r.cliente_nombre || '',
+          nota:          r.nota || ''
+        }));
+        console.log('Migracion completada.');
+      }
+    } catch(e) { console.error('Error en migracion de calendario:', e); }
+    localStorage.removeItem('crm_calendar_events');
   }
+
+  renderCalendario();
 }
 
 function calGoToday() {
@@ -5941,43 +5974,50 @@ async function saveCalEvent() {
   if (!titulo || !fecha) { alert('Completá el título y la fecha.'); return; }
 
   const clienteId = document.getElementById('cal-f-cliente').value;
-  const clienteNombre = clienteId
-    ? (clientes.find(c => c.id === clienteId)?.empresa || '')
-    : '';
+  const clienteNombre = clienteId ? (clientes.find(c => c.id === clienteId)?.empresa || '') : '';
 
-  const evento = {
-    id:            editingCalId || Date.now().toString(),
-    titulo, fecha,
-    hora:          document.getElementById('cal-f-hora').value,
-    tipo:          document.getElementById('cal-f-tipo').value,
-    clienteId,     clienteNombre,
-    nota:          document.getElementById('cal-f-nota').value.trim()
-  };
-
-  // Actualizar array local
+  let evObj;
   if (editingCalId) {
     const idx = calEventos.findIndex(e => e.id === editingCalId);
-    if (idx !== -1) calEventos[idx] = evento;
+    if (idx !== -1) {
+      calEventos[idx] = {
+        ...calEventos[idx],
+        titulo, fecha,
+        hora:         document.getElementById('cal-f-hora').value,
+        tipo:         document.getElementById('cal-f-tipo').value,
+        clienteId, clienteNombre,
+        nota:         document.getElementById('cal-f-nota').value.trim()
+      };
+      evObj = calEventos[idx];
+    }
   } else {
-    calEventos.push(evento);
+    evObj = {
+      id: Date.now().toString(),
+      titulo, fecha,
+      hora:         document.getElementById('cal-f-hora').value,
+      tipo:         document.getElementById('cal-f-tipo').value,
+      clienteId, clienteNombre,
+      nota:         document.getElementById('cal-f-nota').value.trim()
+    };
+    calEventos.push(evObj);
   }
 
-  // Si el evento guardado es del día seleccionado, actualizar panel
-  if (calSelectedDate === fecha || !calSelectedDate) calSelectedDate = fecha;
+  if (evObj) await saveCalEventoSupabase(evObj);
 
-  await saveCalStorage(evento, null);
+  const savedFecha = document.getElementById('cal-f-fecha').value;
+  if (calSelectedDate === savedFecha || !calSelectedDate) calSelectedDate = savedFecha;
+
   closeCalModal();
-  // Cambiar mes si el evento guardado es de otro mes
-  const [fy, fm] = fecha.split('-').map(Number);
+  const [fy, fm] = savedFecha.split('-').map(Number);
   calYear = fy; calMonth = fm - 1;
   renderCalendario();
 }
 
-function deleteCalEvent() {
+async function deleteCalEvent() {
   if (!editingCalId) return;
   if (!confirm('¿Eliminar este evento?')) return;
   calEventos = calEventos.filter(e => e.id !== editingCalId);
-  saveCalStorage();
+  await deleteCalEventoSupabase(editingCalId);
   closeCalModal();
   renderCalendario();
 }
