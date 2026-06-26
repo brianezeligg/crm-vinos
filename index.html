@@ -639,6 +639,20 @@ header {
   white-space: nowrap;
 }
 
+/* ── MI SEMANA ── */
+.semana-entry {
+  padding: .7rem .85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  background: var(--bg);
+}
+.semana-entry:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
 /* ── UTILITY ── */
 .mobile-only { display: none; }
 
@@ -2101,7 +2115,7 @@ transition:.2s;
       <button class="nav-tab" onclick="showPage('calendario')">Calendario</button>
       <button class="nav-tab" onclick="showPage('vinos')">Vinos</button>
       <button class="nav-tab" onclick="showPage('financiero')">Financiero</button>
-      <button class="nav-tab" onclick="showPage('estadisticas')">Estadísticas</button><button class="nav-tab" onclick="showPage('pipeline')">Pipeline</button>
+      <button class="nav-tab" onclick="showPage('estadisticas')">Estadísticas</button><button class="nav-tab" onclick="showPage('pipeline')">Pipeline</button><button class="nav-tab" onclick="showPage('semana')">📋 Mi Semana</button>
     </nav>
 
     <div style="display:flex;align-items:center;gap:.5rem;">
@@ -2320,6 +2334,43 @@ transition:.2s;
   </div>
 </div>
 
+
+<div class="page" id="page-semana">
+  <div class="stats-page-title">📋 Mi Semana — Historial de Contactos</div>
+
+  <!-- Toolbar de semana -->
+  <div class="toolbar" style="flex-wrap:wrap;gap:.75rem;align-items:center;">
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <button class="btn btn-outline" id="semana-prev" onclick="semanaNav(-1)">&#8592;</button>
+      <div id="semana-label" style="font-weight:700;font-size:.95rem;min-width:220px;text-align:center;color:var(--primary);"></div>
+      <button class="btn btn-outline" id="semana-next" onclick="semanaNav(1)">&#8594;</button>
+    </div>
+    <button class="btn btn-outline" onclick="semanaGoHoy()" style="font-size:.82rem;">Semana actual</button>
+    <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap;">
+      <select id="semana-filtro-tipo" onchange="renderSemana()" style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.82rem;background:var(--bg);color:var(--text);">
+        <option value="">Todos los tipos</option>
+        <option value="Comentario / Seguimiento">Seguimientos</option>
+        <option value="Venta">Ventas</option>
+        <option value="Consignación">Consignaciones</option>
+        <option value="Devolución">Devoluciones</option>
+        <option value="Muestra">Muestras</option>
+      </select>
+      <select id="semana-filtro-via" onchange="renderSemana()" style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.82rem;background:var(--bg);color:var(--text);">
+        <option value="">Todas las vías</option>
+        <option>Llamada</option><option>Email</option><option>WhatsApp</option><option>Visita</option><option>Pagina Web</option>
+      </select>
+      <button class="btn btn-outline" onclick="semanaSelectAll()" style="font-size:.82rem;">Selec. todo</button>
+      <button class="btn btn-primary" onclick="semanaExport('csv')" style="font-size:.82rem;">⬇ CSV</button>
+      <button class="btn btn-outline" onclick="semanaExport('txt')" style="font-size:.82rem;">⬇ TXT</button>
+    </div>
+  </div>
+
+  <!-- Resumen rápido de la semana -->
+  <div id="semana-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;"></div>
+
+  <!-- Lista de entradas por día -->
+  <div id="semana-list" style="display:flex;flex-direction:column;gap:.75rem;"></div>
+</div>
 
 <div class="page" id="page-pipeline">
   <div class="stats-page-title">Pipeline Comercial</div>
@@ -3100,6 +3151,7 @@ function showPage(name) {
   if (name === 'vinos')        renderVinos();
   if (name === 'pipeline')     renderPipeline();
   if (name === 'calendario')   renderCalendario();
+  if (name === 'semana')       renderSemana();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -6028,6 +6080,271 @@ window.openCalModal   = openCalModal;
 window.closeCalModal  = closeCalModal;
 window.saveCalEvent   = saveCalEvent;
 window.deleteCalEvent = deleteCalEvent;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MI SEMANA — historial semanal con filtros, selección y exportación
+// ══════════════════════════════════════════════════════════════════════════════
+
+let semanaOffset = 0; // 0 = semana actual, -1 = semana pasada, etc.
+
+function semanaLunesViernes(offset) {
+  const hoy   = new Date();
+  const dow   = hoy.getDay(); // 0=dom, 1=lun...
+  const diff  = (dow === 0) ? -6 : 1 - dow; // lunes de esta semana
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() + diff + offset * 7);
+  const viernes = new Date(lunes);
+  viernes.setDate(lunes.getDate() + 4);
+  const fmt = d => d.toISOString().slice(0, 10);
+  return { lunes: fmt(lunes), viernes: fmt(viernes), lunesD: lunes, viernesD: viernes };
+}
+
+function semanaNav(dir) {
+  semanaOffset += dir;
+  renderSemana();
+}
+
+function semanaGoHoy() {
+  semanaOffset = 0;
+  renderSemana();
+}
+window.semanaNav    = semanaNav;
+window.semanaGoHoy  = semanaGoHoy;
+
+function semanaGetEntradas() {
+  const { lunes, viernes } = semanaLunesViernes(semanaOffset);
+  const filtroTipo = document.getElementById('semana-filtro-tipo')?.value || '';
+  const filtroVia  = document.getElementById('semana-filtro-via')?.value  || '';
+
+  const entradas = [];
+  (clientes || []).forEach(c => {
+    (c.historial || []).forEach(h => {
+      if (!h.fecha) return;
+      if (h.fecha < lunes || h.fecha > viernes) return;
+      if (filtroTipo && h.tipoMovimiento !== filtroTipo) return;
+      if (filtroVia  && h.via           !== filtroVia)  return;
+      entradas.push({
+        ...h,
+        clienteId:     c.id,
+        clienteNombre: c.empresa || '—',
+        clienteEstado: c.estado  || '—',
+      });
+    });
+  });
+  // Ordenar: más reciente primero, luego por timestamp
+  entradas.sort((a, b) => {
+    if (b.fecha !== a.fecha) return b.fecha.localeCompare(a.fecha);
+    return (b.timestamp || '').localeCompare(a.timestamp || '');
+  });
+  return entradas;
+}
+
+function renderSemana() {
+  const { lunes, viernes, lunesD, viernesD } = semanaLunesViernes(semanaOffset);
+
+  // Label de semana
+  const opts = { day: '2-digit', month: 'short' };
+  const label = `Lun ${lunesD.toLocaleDateString('es-ES', opts)} — Vie ${viernesD.toLocaleDateString('es-ES', opts)}`;
+  const el = document.getElementById('semana-label');
+  if (el) el.textContent = label;
+
+  const entradas = semanaGetEntradas();
+
+  // ── Stats rápidas ──
+  const statsEl = document.getElementById('semana-stats');
+  if (statsEl) {
+    const total  = entradas.length;
+    const tipos  = {};
+    const vias   = {};
+    entradas.forEach(e => {
+      const t = e.tipoMovimiento || 'Sin tipo';
+      const v = e.via || 'Sin vía';
+      tipos[t] = (tipos[t] || 0) + 1;
+      vias[v]  = (vias[v]  || 0) + 1;
+    });
+    const topTipo = Object.entries(tipos).sort((a,b)=>b[1]-a[1])[0];
+    const topVia  = Object.entries(vias).sort((a,b)=>b[1]-a[1])[0];
+    const clientes_unicos = new Set(entradas.map(e => e.clienteId)).size;
+
+    statsEl.innerHTML = [
+      { label: 'Contactos esta semana', num: total },
+      { label: 'Clientes distintos',    num: clientes_unicos },
+      { label: 'Tipo más frecuente',    num: topTipo ? topTipo[0].replace('Comentario / Seguimiento','Seguimiento') : '—' },
+      { label: 'Vía más usada',         num: topVia  ? topVia[0] : '—' },
+    ].map(d => `
+      <div class="stat-card">
+        <div class="stat-label">${d.label}</div>
+        <div class="stat-num ${String(d.num).length > 10 ? 'small' : ''}">${d.num}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Lista agrupada por día ──
+  const listEl = document.getElementById('semana-list');
+  if (!listEl) return;
+
+  if (!entradas.length) {
+    listEl.innerHTML = `
+      <div class="table-wrap" style="padding:2rem;text-align:center;color:var(--text-muted);">
+        Sin contactos registrados para esta semana.
+      </div>`;
+    return;
+  }
+
+  // Agrupar por fecha
+  const porDia = {};
+  entradas.forEach(e => {
+    if (!porDia[e.fecha]) porDia[e.fecha] = [];
+    porDia[e.fecha].push(e);
+  });
+
+  const diasLabel = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const TIPO_COLORS = {
+    'Comentario / Seguimiento': '#6b7280',
+    'Venta':       '#16a34a',
+    'Consignación':'#2563eb',
+    'Devolución':  '#dc2626',
+    'Muestra':     '#d97706',
+  };
+
+  listEl.innerHTML = Object.entries(porDia).map(([fecha, items]) => {
+    const d    = new Date(fecha + 'T12:00:00');
+    const dName = diasLabel[d.getDay()];
+    const dLabel = d.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
+
+    const rows = items.map(e => {
+      const color = TIPO_COLORS[e.tipoMovimiento] || '#888';
+      const tipo  = (e.tipoMovimiento || 'Sin tipo').replace('Comentario / Seguimiento','Seguimiento');
+      return `
+        <div class="semana-entry" data-id="${e.id}" data-cliente="${esc(e.clienteNombre)}" data-fecha="${e.fecha}" data-via="${esc(e.via||'')}" data-tipo="${esc(tipo)}" data-nota="${esc(e.nota||'')}" onclick="semanaToggleCheck(this)">
+          <div style="display:flex;gap:.5rem;align-items:flex-start;">
+            <input type="checkbox" class="semana-cb" style="margin-top:3px;accent-color:var(--primary);width:16px;height:16px;flex-shrink:0;" onclick="event.stopPropagation();semanaToggleCheck(this.closest('.semana-entry'))">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.3rem;">
+                <span style="font-weight:700;font-size:.9rem;color:var(--text);">${esc(e.clienteNombre)}</span>
+                <span style="font-size:.72rem;padding:.15rem .5rem;border-radius:5px;background:${color}22;color:${color};border:1px solid ${color}44;font-weight:600;">${tipo}</span>
+                ${e.via ? `<span style="font-size:.72rem;color:var(--text-muted);">via ${esc(e.via)}</span>` : ''}
+                ${e.vendedor ? `<span style="font-size:.72rem;color:var(--text-muted);">👤 ${esc(e.vendedor)}</span>` : ''}
+              </div>
+              <div style="font-size:.85rem;color:var(--text);line-height:1.5;white-space:pre-wrap;">${esc(e.nota || '(sin nota)')}</div>
+              ${e.ventas && e.ventas.length ? `<div style="margin-top:.35rem;font-size:.75rem;color:var(--text-muted);">${e.ventas.map(v=>`${esc(v.vinoNombre||'?')} × ${v.cantidad}`).join(' · ')}</div>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="table-wrap" style="overflow:visible;">
+        <div style="padding:.85rem 1.25rem .5rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid var(--border);">
+          <span style="font-weight:700;font-size:1rem;color:var(--primary);text-transform:capitalize;">${dLabel}</span>
+          <span style="font-size:.75rem;background:var(--primary-light);color:var(--primary);border-radius:99px;padding:.15rem .55rem;font-weight:700;">${items.length}</span>
+        </div>
+        <div style="padding:.75rem 1.25rem;display:flex;flex-direction:column;gap:.6rem;">
+          ${rows}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function semanaToggleCheck(el) {
+  if (!el) return;
+  const cb = el.querySelector('.semana-cb');
+  if (!cb) return;
+  cb.checked = !cb.checked;
+  el.style.background = cb.checked ? 'var(--primary-light)' : '';
+  el.style.borderRadius = cb.checked ? '8px' : '';
+}
+window.semanaToggleCheck = semanaToggleCheck;
+
+function semanaSelectAll() {
+  const entries = document.querySelectorAll('#semana-list .semana-entry');
+  const allChecked = [...entries].every(e => e.querySelector('.semana-cb')?.checked);
+  entries.forEach(e => {
+    const cb = e.querySelector('.semana-cb');
+    if (cb) {
+      cb.checked = !allChecked;
+      e.style.background   = !allChecked ? 'var(--primary-light)' : '';
+      e.style.borderRadius = !allChecked ? '8px' : '';
+    }
+  });
+}
+window.semanaSelectAll = semanaSelectAll;
+
+function semanaExport(formato) {
+  const { lunes, viernes } = semanaLunesViernes(semanaOffset);
+
+  // Tomar seleccionados; si ninguno seleccionado, tomar todos los visibles
+  const allEntries = [...document.querySelectorAll('#semana-list .semana-entry')];
+  const selected   = allEntries.filter(e => e.querySelector('.semana-cb')?.checked);
+  const targets    = selected.length ? selected : allEntries;
+
+  if (!targets.length) { alert('No hay entradas para exportar en esta semana.'); return; }
+
+  const rows = targets.map(el => ({
+    fecha:    el.dataset.fecha    || '',
+    cliente:  el.dataset.cliente  || '',
+    tipo:     el.dataset.tipo     || '',
+    via:      el.dataset.via      || '',
+    nota:     el.dataset.nota     || '',
+  }));
+
+  const semLabel = `${lunes}_${viernes}`;
+
+  if (formato === 'csv') {
+    const q  = v => `"${String(v).replace(/"/g,'""')}"`;
+    const hd = ['Fecha','Cliente','Tipo','Vía','Nota'].map(q).join(',');
+    const body = rows.map(r => [r.fecha, r.cliente, r.tipo, r.via, r.nota].map(q).join(','));
+    const csv  = '\uFEFF' + [hd, ...body].join('\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `mi_semana_${semLabel}.csv`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  } else {
+    // TXT — formato legible
+    const lineas = [];
+    lineas.push(`REPORTE SEMANAL — CRM Vinos Argentina`);
+    lineas.push(`Semana: ${lunes} al ${viernes}`);
+    lineas.push(`Generado: ${new Date().toLocaleDateString('es-ES', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}`);
+    lineas.push('═'.repeat(60));
+    lineas.push('');
+
+    // Agrupar por fecha
+    const porDia = {};
+    rows.forEach(r => {
+      if (!porDia[r.fecha]) porDia[r.fecha] = [];
+      porDia[r.fecha].push(r);
+    });
+
+    Object.entries(porDia).forEach(([fecha, items]) => {
+      const d     = new Date(fecha + 'T12:00:00');
+      const dLabel = d.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
+      lineas.push(`📅  ${dLabel.toUpperCase()}`);
+      lineas.push('─'.repeat(60));
+      items.forEach((r, i) => {
+        lineas.push(`${i+1}. ${r.cliente}  [${r.tipo}${r.via ? ' · ' + r.via : ''}]`);
+        if (r.nota) r.nota.split('\n').forEach(l => lineas.push(`   ${l}`));
+        lineas.push('');
+      });
+    });
+
+    lineas.push('═'.repeat(60));
+    lineas.push(`Total: ${rows.length} contacto(s)`);
+
+    const txt  = lineas.join('\n');
+    const blob = new Blob([txt], { type:'text/plain;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `mi_semana_${semLabel}.txt`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+}
+window.semanaExport = semanaExport;
 
 </script>
 </html>
