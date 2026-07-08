@@ -2619,17 +2619,13 @@ transition:.2s;
 </div>
 
 <div class="form-group full">
-  <label>Logo / Imagen (URL)</label>
+  <label>Página web</label>
   <input
     type="text"
     id="f-logo"
-    placeholder="https://..."
+    placeholder="https://www.tuweb.com"
   >
 </div>
-      <div class="form-group full">
-        <label>Comentario / Respuesta</label>
-        <textarea id="f-nota" rows="3" placeholder="Ej: Interesado en Malbec, pide muestra…"></textarea>
-      </div>
 
       <div class="form-group full">
         <label>Notas privadas internas</label>
@@ -3216,40 +3212,21 @@ return `
     "
   >
 
-    ${
-      c.logo
-        ? `
-          <img
-            src="${esc(c.logo)}"
-            style="
-              width:38px;
-              height:38px;
-              object-fit:cover;
-              border-radius:10px;
-              border:1px solid rgba(0,0,0,.06);
-              background:white;
-              flex-shrink:0;
-            "
-          >
-        `
-        : `
-          <div
-            style="
-              width:38px;
-              height:38px;
-              border-radius:10px;
-              background:rgba(123,31,58,.08);
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              font-size:.9rem;
-              flex-shrink:0;
-            "
-          >
-            🍷
-          </div>
-        `
-    }
+    <div
+      style="
+        width:38px;
+        height:38px;
+        border-radius:10px;
+        background:rgba(123,31,58,.08);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:.9rem;
+        flex-shrink:0;
+      "
+    >
+      🍷
+    </div>
 
     <div>
       <div style="font-weight:600">${esc(c.empresa)}</div>
@@ -3787,7 +3764,6 @@ function openModal(id) {
   document.getElementById('f-logo').value      = c.logo      || '';
   // estado se cambia desde la ficha del cliente
   // fecha y proximo se actualizan desde el historial de contactos
-  document.getElementById('f-nota').value      = c.nota      || '';
   document.getElementById('f-private-notes') && (document.getElementById('f-private-notes').value = c.private_notes || '');
   document.getElementById('f-iban').value      = c.iban      || '';
   document.getElementById('modal').classList.add('open');
@@ -3816,6 +3792,8 @@ async function saveCliente() {
       return;
     }
 
+    const clienteOriginal = editingId ? clientes.find(x => x.id === editingId) : null;
+
     const c = {
       empresa,
       tipo:          document.getElementById('f-tipo').value,
@@ -3828,7 +3806,7 @@ async function saveCliente() {
       logo:          document.getElementById('f-logo').value.trim(),
       // estado se mantiene sin cambios (se cambia desde la ficha)
       // fecha y proximo se mantienen sin cambios (se actualizan desde historial)
-      nota:          document.getElementById('f-nota').value.trim(),
+      nota:          clienteOriginal?.nota || '',
       private_notes: (document.getElementById('f-private-notes')?.value || '').trim(),
       iban:          document.getElementById('f-iban').value.trim(),
     };
@@ -3880,20 +3858,7 @@ function openSheet(id) {
   const isOverdue = c.proximo && c.proximo <= t && c.estado !== 'Cerrado' && c.estado !== 'No interesa';
 
   document.getElementById('sheet-empresa').textContent = c.empresa;
-const sheetLogo =
-  document.getElementById('sheet-logo');
-
-if (c.logo) {
-
-  sheetLogo.src = c.logo;
-
-  sheetLogo.style.display = 'block';
-
-} else {
-
-  sheetLogo.style.display = 'none';
-
-}
+  document.getElementById('sheet-logo').style.display = 'none';
   document.getElementById('sheet-badges').innerHTML =
     `<span class="badge badge-outline">${esc(c.tipo)}</span>
      <span class="badge badge-secondary">${esc(c.pais)}</span>
@@ -4003,6 +3968,7 @@ if (c.logo) {
         ${c.email ? `<div class="info-inline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><a class="info-link" href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
         ${c.telefono ? `<a class="btn btn-primary" href="https://wa.me/${c.telefono.replace(/\D/g,'')}" target="_blank" style="margin-top:.8rem;width:100%;justify-content:center;text-decoration:none;">WhatsApp</a>` : ''}
         ${c.direccion ? `<div class="info-inline" style="margin-top:.6rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><a class="info-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.direccion)}" target="_blank">${esc(c.direccion)}</a></div>` : ''}
+        ${c.logo ? `<div class="info-inline" style="margin-top:.6rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><a class="info-link" href="${esc(/^https?:\/\//i.test(c.logo) ? c.logo : 'https://' + c.logo)}" target="_blank">${esc(c.logo)}</a></div>` : ''}
         <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.75rem;display:flex;align-items:center;gap:.6rem;">
           <label style="font-size:.75rem;color:var(--text-muted);font-weight:600;white-space:nowrap;">ESTADO</label>
           <select onchange="cambiarEstadoSheet('${c.id}', this.value)" style="flex:1;border:1px solid var(--border);border-radius:8px;padding:.3rem .6rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);">
