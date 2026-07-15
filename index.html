@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2156,7 +2157,7 @@ transition:.2s;
   <div class="toolbar">
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" id="search" placeholder="Buscar empresa o contacto…">
+      <input type="text" id="search" placeholder="Buscar empresa, contacto, ciudad, teléfono, email…">
     </div>
     <div class="toolbar-selects">
       <select id="filterEstado">
@@ -2219,6 +2220,10 @@ transition:.2s;
     <input type="text" id="search-vino"     placeholder="Buscar vino…"     style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
     <input type="text" id="search-bodega"   placeholder="Buscar bodega…"   style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
     <input type="text" id="search-varietal" placeholder="Buscar varietal…" style="border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;font-size:.85rem;background:var(--bg-card);color:var(--text-primary);width:160px;">
+    <button class="btn btn-outline" onclick="exportVinosCSV()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Descargar Vinos (Excel)
+    </button>
     <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;">
       <label style="font-size:.8rem;color:var(--text-muted);font-weight:500;">Alerta stock bajo:</label>
       <input type="number" id="stock-threshold" value="6" min="1" style="width:70px;" onchange="renderVinos()">
@@ -2360,7 +2365,7 @@ transition:.2s;
         <option>Llamada</option><option>Email</option><option>WhatsApp</option><option>Visita</option><option>Pagina Web</option>
       </select>
       <button class="btn btn-outline" onclick="semanaSelectAll()" style="font-size:.82rem;">Selec. todo</button>
-      <button class="btn btn-primary" onclick="semanaExport('csv')" style="font-size:.82rem;">⬇ CSV</button>
+      <button class="btn btn-primary" onclick="semanaExport('excel')" style="font-size:.82rem;">⬇ Excel</button>
       <button class="btn btn-outline" onclick="semanaExport('txt')" style="font-size:.82rem;">⬇ TXT</button>
     </div>
   </div>
@@ -2672,7 +2677,7 @@ transition:.2s;
       <button class="btn btn-outline" onclick="closeExportModal()">Cancelar</button>
       <button class="btn btn-success" onclick="doExportCSV()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Descargar CSV
+        Descargar Excel
       </button>
     </div>
   </div>
@@ -3165,11 +3170,30 @@ function renderTable() {
   const pending = pendingClientes().map(c => c.id);
 
   const filtered = clientes.filter(c => {
-    const empresa  = (c.empresa  || '').toLowerCase();
-    const contacto = (c.contacto || '').toLowerCase();
-    const tipo     = (c.tipo     || '').toLowerCase();
-    const email    = (c.email    || '').toLowerCase();
-    const matchQ = !q || empresa.includes(q) || contacto.includes(q) || tipo.includes(q) || email.includes(q);
+    const empresa   = (c.empresa   || '').toLowerCase();
+    const contacto  = (c.contacto  || '').toLowerCase();
+    const tipo      = (c.tipo      || '').toLowerCase();
+    const email     = (c.email     || '').toLowerCase();
+    const ciudad    = (c.ciudad    || '').toLowerCase();
+    const pais      = (c.pais      || '').toLowerCase();
+    const telefono  = (c.telefono  || '').toLowerCase();
+    const telefonoDigits = telefono.replace(/\D/g, '');
+    const qDigits   = q.replace(/\D/g, '');
+    const direccion = (c.direccion || '').toLowerCase();
+    const iban      = (c.iban      || '').toLowerCase();
+    const notas     = (c.private_notes || '').toLowerCase();
+    const matchQ = !q
+      || empresa.includes(q)
+      || contacto.includes(q)
+      || tipo.includes(q)
+      || email.includes(q)
+      || ciudad.includes(q)
+      || pais.includes(q)
+      || telefono.includes(q)
+      || (qDigits.length >= 3 && telefonoDigits.includes(qDigits))
+      || direccion.includes(q)
+      || iban.includes(q)
+      || notas.includes(q);
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
     return matchQ && matchE && matchP;
@@ -4857,7 +4881,102 @@ async function deleteWine(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EXPORT MODAL — CSV de clientes, ventas o financiero
+// ESTILO COMPARTIDO PARA EXPORTS EXCEL (marca CRM Vinos)
+// ══════════════════════════════════════════════════════════════════════════════
+const XLS_BRAND      = '7B1F3A';
+const XLS_BRAND_DARK = '5A1629';
+const XLS_ZEBRA       = 'F9F0F3';
+const XLS_MUTED_TEXT  = '6B5057';
+
+function hexNoHash(hex) { return String(hex || '000000').replace('#', '').toUpperCase(); }
+
+function buildStyledSheet(workbook, { sheetName, title, headers, rows, colWidths = [], currencyCols = [], centerCols = [], colorRules = {} }) {
+  const ws = workbook.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 3 }] });
+  const colCount = headers.length;
+
+  // Título
+  ws.mergeCells(1, 1, 1, colCount);
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = title;
+  titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + XLS_BRAND } };
+  ws.getRow(1).height = 30;
+
+  // Subtítulo (fecha de generación)
+  ws.mergeCells(2, 1, 2, colCount);
+  const subCell = ws.getCell(2, 1);
+  subCell.value = `Generado el ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })} · CRM Vinos · ${rows.length} registro(s)`;
+  subCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF' + XLS_MUTED_TEXT } };
+  subCell.alignment = { vertical: 'middle', indent: 1 };
+  subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + XLS_ZEBRA } };
+  ws.getRow(2).height = 20;
+
+  // Encabezados (fila 3)
+  const headerRow = ws.getRow(3);
+  headers.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + XLS_BRAND_DARK } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFDDDDDD' } }, left: { style: 'thin', color: { argb: 'FFDDDDDD' } },
+      bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } }, right: { style: 'thin', color: { argb: 'FFDDDDDD' } }
+    };
+  });
+  headerRow.height = 26;
+
+  // Filas de datos (desde la fila 4)
+  rows.forEach((rowData, rIdx) => {
+    const row = ws.getRow(4 + rIdx);
+    const zebra = rIdx % 2 === 1;
+    rowData.forEach((val, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = (val === undefined || val === null || val === '') ? null : val;
+      cell.font = { name: 'Arial', size: 10 };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFEFEFEF' } }, left: { style: 'thin', color: { argb: 'FFEFEFEF' } },
+        bottom: { style: 'thin', color: { argb: 'FFEFEFEF' } }, right: { style: 'thin', color: { argb: 'FFEFEFEF' } }
+      };
+      if (zebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + XLS_ZEBRA } };
+      if (currencyCols.includes(cIdx)) {
+        cell.numFmt = '"€"#,##0.00';
+        cell.alignment = { horizontal: 'right' };
+      }
+      if (centerCols.includes(cIdx)) cell.alignment = { horizontal: 'center' };
+      const rule = colorRules[cIdx] && colorRules[cIdx](val, rowData);
+      if (rule) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + hexNoHash(rule.bg) } };
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF' + hexNoHash(rule.text || '000000') } };
+        cell.alignment = { horizontal: 'center' };
+      }
+    });
+  });
+
+  headers.forEach((h, i) => {
+    ws.getColumn(i + 1).width = colWidths[i] || Math.min(Math.max(h.length + 4, 12), 32);
+  });
+
+  ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: colCount } };
+  return ws;
+}
+
+async function downloadWorkbook(workbook, filename) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href       = url;
+  a.download   = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT MODAL — Excel con formato de clientes, ventas o financiero
 // ══════════════════════════════════════════════════════════════════════════════
 let exportTab = 'clientes';
 
@@ -4880,22 +4999,32 @@ function switchExportTab(tab) {
   updateExportPreview();
 }
 
-function getExportData() {
-  const q = v => `"${String(v || '').replace(/"/g, '""')}"`;
-
-  if (exportTab === 'clientes') {
-    const headers = ['Empresa','Tipo','País','Contacto','Teléfono','Email','Dirección','Estado','Último Contacto','Vía','Próximo Seguimiento','Comentario'];
-    const rows = clientes.map(c => [c.empresa,c.tipo,c.pais,c.contacto,c.telefono,c.email,c.direccion,c.estado,c.fecha,c.via,c.proximo,c.nota].map(q).join(','));
-    return { headers, rows };
+// Devuelve filas "crudas" (valores, no strings formateados) para reusarlas
+// tanto en la vista previa de texto como en la hoja de Excel con estilo.
+function getExportRows(tab) {
+  if (tab === 'clientes') {
+    const headers = ['Empresa', 'Tipo', 'País', 'Ciudad', 'Contacto', 'Teléfono', 'Email', 'Dirección', 'Estado', 'Último Contacto', 'Vía', 'Próximo Seguimiento', 'Comentario'];
+    const rows = clientes.map(c => [c.empresa, c.tipo, c.pais, c.ciudad, c.contacto, c.telefono, c.email, c.direccion, c.estado, c.fecha, c.via, c.proximo, c.nota]);
+    return {
+      headers, rows,
+      colWidths: [22, 14, 14, 14, 18, 16, 24, 26, 14, 16, 12, 16, 30],
+      centerCols: [8],
+      colorRules: { 8: (val) => { const c = ESTADO_COLORS[val]; return c ? { bg: c.bg, text: c.text } : null; } },
+    };
   }
 
-  if (exportTab === 'ventas') {
-    const headers = ['Fecha','Cliente','Vino','Cantidad','Precio Unitario','Total','Ganancia Neta','Vendedor','Nota'];
+  if (tab === 'ventas') {
+    const headers = ['Fecha', 'Cliente', 'Vino', 'Cantidad', 'Precio Unitario', 'Total', 'Ganancia Neta', 'Vendedor', 'Nota'];
     const rows = ventas.map(v => {
       const gan = calcVentaGanancia(v);
-      return [v.fecha,v.cliente_nombre,v.vino_nombre,v.cantidad,v.precio_unitario,v.total,gan.toFixed(2),v.vendedor,v.nota].map(q).join(',');
+      return [v.fecha, v.cliente_nombre, v.vino_nombre, Number(v.cantidad || 0), Number(v.precio_unitario || 0), Number(v.total || 0), Number(gan.toFixed(2)), v.vendedor, v.nota];
     });
-    return { headers, rows };
+    return {
+      headers, rows,
+      colWidths: [14, 22, 22, 10, 14, 12, 14, 16, 26],
+      currencyCols: [4, 5, 6],
+      colorRules: { 6: (val) => val < 0 ? { bg: 'FEF2F2', text: '991B1B' } : { bg: 'F0FDF4', text: '166534' } },
+    };
   }
 
   // financiero
@@ -4916,43 +5045,117 @@ function getExportData() {
     row.ganancia += tot - cpra * cant;
     if (cant > 0 && (!row.ultima || v.fecha > row.ultima)) row.ultima = v.fecha;
   });
-  const headers = ['Cliente','Compras','Botellas','Total Gastado','Costo Total','Ganancia Neta','Última Compra'];
-  const rows = Object.values(porCliente).sort((a,b) => b.total - a.total).map(r =>
-    [r.nombre, r.compras, r.botellas, r.total.toFixed(2), r.costo.toFixed(2), r.ganancia.toFixed(2), r.ultima].map(q).join(',')
+  const headers = ['Cliente', 'Compras', 'Botellas', 'Total Gastado', 'Costo Total', 'Ganancia Neta', 'Última Compra'];
+  const rows = Object.values(porCliente).sort((a, b) => b.total - a.total).map(r =>
+    [r.nombre, r.compras, r.botellas, Number(r.total.toFixed(2)), Number(r.costo.toFixed(2)), Number(r.ganancia.toFixed(2)), r.ultima]
   );
-  return { headers, rows };
+  return {
+    headers, rows,
+    colWidths: [24, 12, 12, 16, 16, 16, 16],
+    currencyCols: [3, 4, 5],
+    colorRules: { 5: (val) => val < 0 ? { bg: 'FEF2F2', text: '991B1B' } : { bg: 'F0FDF4', text: '166534' } },
+  };
 }
 
 function updateExportPreview() {
-  const { headers, rows } = getExportData();
-  const preview = [headers.join(','), ...rows.slice(0, 3)].join('\n');
+  const { headers, rows } = getExportRows(exportTab);
+  const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const preview = [headers.join(','), ...rows.slice(0, 3).map(r => r.map(q).join(','))].join('\n');
   document.getElementById('export-preview').textContent = preview || '(sin datos)';
 }
 
 let exportingCSV = false;
 
-function doExportCSV() {
-
+async function doExportCSV() {
   if (exportingCSV) return;
-
   exportingCSV = true;
 
-  const { headers, rows } = getExportData();
-  const csv  = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `crm_vinos_${exportTab}_${today()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-    closeExportModal();
+  try {
+    const { headers, rows, colWidths, currencyCols, centerCols, colorRules } = getExportRows(exportTab);
+    const titles = { clientes: '👥 Clientes — CRM Vinos', ventas: '🛒 Ventas — CRM Vinos', financiero: '💰 Financiero — CRM Vinos' };
+    const sheetNames = { clientes: 'Clientes', ventas: 'Ventas', financiero: 'Financiero' };
 
-  setTimeout(() => {
-    exportingCSV = false;
-  }, 1000);
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CRM Vinos';
+    workbook.created = new Date();
+
+    buildStyledSheet(workbook, {
+      sheetName: sheetNames[exportTab],
+      title: titles[exportTab],
+      headers, rows, colWidths, currencyCols, centerCols, colorRules,
+    });
+
+    await downloadWorkbook(workbook, `crm_vinos_${exportTab}_${today()}.xlsx`);
+    closeExportModal();
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo generar el archivo Excel.');
+  } finally {
+    setTimeout(() => { exportingCSV = false; }, 1000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EXPORT EXCEL — Vinos (todos: en stock, bajo stock e inactivos)
+// ══════════════════════════════════════════════════════════════════════════════
+let exportingVinosCSV = false;
+
+async function exportVinosCSV() {
+  if (exportingVinosCSV) return;
+  exportingVinosCSV = true;
+
+  try {
+    const threshold = getStockThreshold();
+    const headers = ['Vino', 'Bodega', 'Varietal', 'Precio Compra', 'Precio Venta', 'Margen (€)', 'Margen (%)', 'Stock', 'Estado Stock', 'Activo'];
+
+    const rows = vinos.map(v => {
+      const inactivo = !!v.inactivo;
+      const stock    = Number(v.stock_actual || 0);
+      const margen   = calcMargen(v);
+      const estadoStock = inactivo ? 'Inactivo' : (stock <= threshold ? `Bajo (${stock})` : `OK (${stock})`);
+
+      return [
+        v.nombre,
+        v.bodega || '',
+        v.varietal || '',
+        Number(v.precio_compra || 0),
+        Number(v.precio_venta  || 0),
+        margen ? Number(margen.bruto.toFixed(2)) : '',
+        margen ? Number(margen.pct.toFixed(0))   : '',
+        stock,
+        estadoStock,
+        inactivo ? 'No' : 'Sí',
+      ];
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CRM Vinos';
+    workbook.created = new Date();
+
+    buildStyledSheet(workbook, {
+      sheetName: 'Vinos',
+      title: '🍷 Stock de Vinos — CRM Vinos',
+      headers, rows,
+      colWidths: [30, 20, 20, 14, 14, 13, 12, 10, 16, 10],
+      currencyCols: [3, 4, 5],
+      centerCols: [6, 7, 9],
+      colorRules: {
+        8: (val) => {
+          if (val === 'Inactivo') return { bg: 'E5E7EB', text: '374151' };
+          if (String(val).startsWith('Bajo')) return { bg: 'FFFBEB', text: '78350F' };
+          return { bg: 'F0FDF4', text: '166534' };
+        },
+        9: (val) => val === 'Sí' ? { bg: 'F0FDF4', text: '166534' } : { bg: 'FEF2F2', text: '991B1B' },
+      },
+    });
+
+    await downloadWorkbook(workbook, `crm_vinos_stock_${today()}.xlsx`);
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo generar el archivo Excel.');
+  } finally {
+    setTimeout(() => { exportingVinosCSV = false; }, 1000);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5494,6 +5697,7 @@ window.openExportModal  = openExportModal;
 window.closeExportModal = closeExportModal;
 window.switchExportTab  = switchExportTab;
 window.doExportCSV      = doExportCSV;
+window.exportVinosCSV   = exportVinosCSV;
 window.editFromSheet    = editFromSheet;
 window.deleteFromSheet  = deleteFromSheet;
 window.saveNewContact   = saveNewContact;
@@ -6256,21 +6460,40 @@ function semanaExport(formato) {
 
   const semLabel = `${lunes}_${viernes}`;
 
-  if (formato === 'csv') {
-    const q  = v => `"${String(v).replace(/"/g,'""')}"`;
-    const hd = ['Fecha','Cliente','Tipo','Vía','Nota'].map(q).join(',');
-    const body = rows.map(r => [r.fecha, r.cliente, r.tipo, r.via, r.nota].map(q).join(','));
-    const csv  = '\uFEFF' + [hd, ...body].join('\n');
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `mi_semana_${semLabel}.csv`;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+  if (formato === 'excel') {
+    const TIPO_COLORS_XLS = {
+      'Seguimiento':   { bg: 'F3F4F6', text: '374151' },
+      'Venta':         { bg: 'F0FDF4', text: '166534' },
+      'Consignación':  { bg: 'E6F1FB', text: '0C447C' },
+      'Devolución':    { bg: 'FEF2F2', text: '991B1B' },
+      'Muestra':       { bg: 'FFFBEB', text: '78350F' },
+    };
 
-  } else {
-    // TXT — formato legible
+    const headers = ['Fecha', 'Cliente', 'Tipo', 'Vía', 'Nota'];
+    const dataRows = rows.map(r => [r.fecha, r.cliente, r.tipo, r.via, r.nota]);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CRM Vinos';
+    workbook.created = new Date();
+
+    const ws = buildStyledSheet(workbook, {
+      sheetName: 'Mi Semana',
+      title: `📋 Mi Semana — ${lunes} al ${viernes}`,
+      headers,
+      rows: dataRows,
+      colWidths: [14, 24, 18, 14, 45],
+      centerCols: [0, 2, 3],
+      colorRules: { 2: (val) => TIPO_COLORS_XLS[val] || null },
+    });
+    // Las notas pueden ser largas: permitir salto de línea y alinear arriba
+    ws.getColumn(5).alignment = { wrapText: true, vertical: 'top' };
+
+    downloadWorkbook(workbook, `mi_semana_${semLabel}.xlsx`);
+    return;
+  }
+
+  // TXT — formato legible
+  {
     const lineas = [];
     lineas.push(`REPORTE SEMANAL — CRM Vinos Argentina`);
     lineas.push(`Semana: ${lunes} al ${viernes}`);
