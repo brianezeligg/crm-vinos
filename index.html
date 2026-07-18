@@ -2157,7 +2157,7 @@ transition:.2s;
   <div class="toolbar">
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" id="search" placeholder="Buscar empresa, contacto, ciudad, teléfono, email…">
+      <input type="text" id="search" placeholder="Buscar empresa, contacto, ciudad, teléfono, email, cocina…">
     </div>
     <div class="toolbar-selects">
       <select id="filterEstado">
@@ -2169,6 +2169,12 @@ transition:.2s;
       <select id="filterPais">
         <option value="">Todos los países</option>
         <option>Luxemburgo</option><option>Bélgica</option><option>Alemania</option><option>Paises bajos</option><option>Francia</option>
+      </select>
+      <select id="filterCocina">
+        <option value="">Todas las cocinas</option>
+        <option>Española</option><option>Italiana</option><option>Francesa</option>
+        <option>Internacional</option><option>Asiática</option><option>Portuguesa</option>
+        <option>Fusión</option><option>Mediterránea</option><option>Otra</option>
       </select>
     </div>
     <div class="toolbar-actions">
@@ -2593,6 +2599,24 @@ transition:.2s;
           <option value="">Seleccione…</option>
           <option>Restaurante</option><option>Vinoteca</option><option>Supermercado</option>
           <option>Hotel</option><option>Importador</option><option>Distribuidor</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de cocina</label>
+        <select id="f-cocina">
+          <option value="">Seleccione…</option>
+          <option>Española</option><option>Italiana</option><option>Francesa</option>
+          <option>Internacional</option><option>Asiática</option><option>Portuguesa</option>
+          <option>Fusión</option><option>Mediterránea</option><option>Otra</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Rango de precio</label>
+        <select id="f-precio">
+          <option value="">Seleccione…</option>
+          <option value="1">€ — Económico</option>
+          <option value="2">€€ — Medio</option>
+          <option value="3">€€€ — Alto</option>
         </select>
       </div>
       <div class="form-group">
@@ -3067,6 +3091,20 @@ function stateBadge(estado) {
   return `<span class="badge" style="background:${c.bg};color:${c.text}">${esc(estado)}</span>`;
 }
 
+// Convierte el nivel de precio (1, 2 o 3) en signos de € (texto plano, sin HTML)
+function precioBadgeTexto(nivel) {
+  const n = Number(nivel);
+  if (!n || n < 1) return '';
+  return '€'.repeat(Math.min(n, 3));
+}
+
+// Badge de precio con estilo, para usar en la ficha de detalle del cliente
+function precioBadgeHTML(nivel) {
+  const texto = precioBadgeTexto(nivel);
+  if (!texto) return '';
+  return `<span class="badge badge-outline" title="Nivel de precio">${texto}</span>`;
+}
+
 function getPrioridad(cliente) {
 
   const overdue =
@@ -3167,12 +3205,14 @@ function renderTable() {
   const q  = getSearchValue();
   const fe = document.getElementById('filterEstado').value;
   const fp = document.getElementById('filterPais').value;
+  const fc = document.getElementById('filterCocina').value;
   const pending = pendingClientes().map(c => c.id);
 
   const filtered = clientes.filter(c => {
     const empresa   = (c.empresa   || '').toLowerCase();
     const contacto  = (c.contacto  || '').toLowerCase();
     const tipo      = (c.tipo      || '').toLowerCase();
+    const cocina    = (c.cocina    || '').toLowerCase();
     const email     = (c.email     || '').toLowerCase();
     const ciudad    = (c.ciudad    || '').toLowerCase();
     const pais      = (c.pais      || '').toLowerCase();
@@ -3186,6 +3226,7 @@ function renderTable() {
       || empresa.includes(q)
       || contacto.includes(q)
       || tipo.includes(q)
+      || cocina.includes(q)
       || email.includes(q)
       || ciudad.includes(q)
       || pais.includes(q)
@@ -3196,7 +3237,8 @@ function renderTable() {
       || notas.includes(q);
     const matchE = !fe || (fe === '__pendiente__' ? pending.includes(c.id) : c.estado === fe);
     const matchP = !fp || c.pais === fp;
-    return matchQ && matchE && matchP;
+    const matchC = !fc || c.cocina === fc;
+    return matchQ && matchE && matchP && matchC;
   }).sort((a, b) => {
     // Próximo seguimiento: primero los que tienen fecha, ordenados de más cercano a más lejano. Sin fecha al final.
     if (a.proximo && b.proximo) return a.proximo.localeCompare(b.proximo);
@@ -3254,14 +3296,17 @@ return `
 
     <div>
       <div style="font-weight:600">${esc(c.empresa)}</div>
-      <div class="mobile-only" style="font-size:.75rem;color:var(--text-muted)">${esc(c.tipo||'')}${c.tipo && c.pais ? ' · ' : ''}${esc(c.pais||'')}</div>
+      <div class="mobile-only" style="font-size:.75rem;color:var(--text-muted)">${esc(c.tipo||'')}${c.tipo && c.pais ? ' · ' : ''}${esc(c.pais||'')}${(c.cocina || c.precio) ? ' · ' : ''}${esc(c.cocina||'')}${c.cocina && c.precio ? ' ' : ''}${precioBadgeTexto(c.precio)}</div>
     </div>
 
   </div>
 
 </td>
 
-          <td data-col="tipo" class="td-muted">${esc(c.tipo)}</td>
+          <td data-col="tipo" class="td-muted">
+            ${esc(c.tipo)}
+            ${(c.cocina || c.precio) ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;">${esc(c.cocina||'')}${c.cocina && c.precio ? ' · ' : ''}${precioBadgeTexto(c.precio)}</div>` : ''}
+          </td>
           <td data-col="pais" class="td-muted">${esc(c.pais)}</td>
           <td data-col="ciudad" class="td-muted">${esc(c.ciudad || '—')}</td>
 
@@ -3779,6 +3824,8 @@ function openModal(id) {
   document.getElementById('modal-title').textContent = id ? 'Editar Cliente' : 'Nuevo Cliente';
   document.getElementById('f-empresa').value   = c.empresa   || '';
   document.getElementById('f-tipo').value      = c.tipo      || '';
+  document.getElementById('f-cocina').value    = c.cocina    || '';
+  document.getElementById('f-precio').value    = c.precio    || '';
   document.getElementById('f-pais').value      = c.pais      || '';
   document.getElementById('f-ciudad').value    = c.ciudad    || '';
   document.getElementById('f-contacto').value  = c.contacto  || '';
@@ -3821,6 +3868,8 @@ async function saveCliente() {
     const c = {
       empresa,
       tipo:          document.getElementById('f-tipo').value,
+      cocina:        document.getElementById('f-cocina').value,
+      precio:        document.getElementById('f-precio').value ? Number(document.getElementById('f-precio').value) : null,
       pais:          document.getElementById('f-pais').value,
       ciudad:        document.getElementById('f-ciudad').value.trim(),
       contacto:      document.getElementById('f-contacto').value.trim(),
@@ -3886,6 +3935,8 @@ function openSheet(id) {
   document.getElementById('sheet-badges').innerHTML =
     `<span class="badge badge-outline">${esc(c.tipo)}</span>
      <span class="badge badge-secondary">${esc(c.pais)}</span>
+     ${c.cocina ? `<span class="badge badge-outline">🍽️ ${esc(c.cocina)}</span>` : ''}
+     ${precioBadgeHTML(c.precio)}
      ${stateBadge(c.estado)}`;
 
   // Historial con ventas y ganancias
@@ -5003,13 +5054,13 @@ function switchExportTab(tab) {
 // tanto en la vista previa de texto como en la hoja de Excel con estilo.
 function getExportRows(tab) {
   if (tab === 'clientes') {
-    const headers = ['Empresa', 'Tipo', 'País', 'Ciudad', 'Contacto', 'Teléfono', 'Email', 'Dirección', 'Estado', 'Último Contacto', 'Vía', 'Próximo Seguimiento', 'Comentario'];
-    const rows = clientes.map(c => [c.empresa, c.tipo, c.pais, c.ciudad, c.contacto, c.telefono, c.email, c.direccion, c.estado, c.fecha, c.via, c.proximo, c.nota]);
+    const headers = ['Empresa', 'Tipo', 'Cocina', 'Precio', 'País', 'Ciudad', 'Contacto', 'Teléfono', 'Email', 'Dirección', 'Estado', 'Último Contacto', 'Vía', 'Próximo Seguimiento', 'Comentario'];
+    const rows = clientes.map(c => [c.empresa, c.tipo, c.cocina, precioBadgeTexto(c.precio), c.pais, c.ciudad, c.contacto, c.telefono, c.email, c.direccion, c.estado, c.fecha, c.via, c.proximo, c.nota]);
     return {
       headers, rows,
-      colWidths: [22, 14, 14, 14, 18, 16, 24, 26, 14, 16, 12, 16, 30],
-      centerCols: [8],
-      colorRules: { 8: (val) => { const c = ESTADO_COLORS[val]; return c ? { bg: c.bg, text: c.text } : null; } },
+      colWidths: [22, 14, 14, 10, 14, 14, 18, 16, 24, 26, 14, 16, 12, 16, 30],
+      centerCols: [10],
+      colorRules: { 10: (val) => { const c = ESTADO_COLORS[val]; return c ? { bg: c.bg, text: c.text } : null; } },
     };
   }
 
@@ -5441,6 +5492,7 @@ function syncOverlay() {
 document.getElementById('search').addEventListener('input', renderTable);
 document.getElementById('filterEstado').addEventListener('change', renderTable);
 document.getElementById('filterPais').addEventListener('change', renderTable);
+document.getElementById('filterCocina').addEventListener('change', renderTable);
 document.getElementById('search-vino').addEventListener('input', renderVinos);
 document.getElementById('search-bodega').addEventListener('input', renderVinos);
 document.getElementById('search-varietal').addEventListener('input', renderVinos);
