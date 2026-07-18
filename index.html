@@ -1411,6 +1411,8 @@ border:1px solid #7dd3fc;
 }
 
 .form-group.last { margin-bottom: 0; }
+.cocina-otra-input { display: none; margin-top: .4rem; }
+.cocina-otra-input.show { display: block !important; }
 
 
 body.dark .modal-box {
@@ -2172,9 +2174,6 @@ transition:.2s;
       </select>
       <select id="filterCocina">
         <option value="">Todas las cocinas</option>
-        <option>Española</option><option>Italiana</option><option>Francesa</option>
-        <option>Internacional</option><option>Asiática</option><option>Portuguesa</option>
-        <option>Fusión</option><option>Argentina</option><option>Libanesa</option><option>China</option><option>Mediterránea</option><option>Otra</option>
       </select>
     </div>
     <div class="toolbar-actions">
@@ -2603,12 +2602,11 @@ transition:.2s;
       </div>
       <div class="form-group">
         <label>Tipo de cocina</label>
-        <select id="f-cocina">
+        <select id="f-cocina" onchange="toggleCocinaOtra()">
           <option value="">Seleccione…</option>
-          <option>Española</option><option>Italiana</option><option>Francesa</option>
-          <option>Internacional</option><option>Asiática</option><option>Portuguesa</option>
-          <option>Fusión</option><option>Mediterránea</option><option>China</option><option>Libanesa</option><option>Argentina</option><option>Otra</option>
+          <option value="__otra__">Otra (especificar)…</option>
         </select>
+        <input type="text" id="f-cocina-otra" class="cocina-otra-input" placeholder="Escribí el tipo de cocina…">
       </div>
       <div class="form-group">
         <label>Rango de precio</label>
@@ -3028,6 +3026,7 @@ async function loadClientes() {
 
   renderTable();
   renderPipeline();
+  populateCocinaSelects();
 }
 
 function renderPipeline() {
@@ -3103,6 +3102,98 @@ function precioBadgeHTML(nivel) {
   const texto = precioBadgeTexto(nivel);
   if (!texto) return '';
   return `<span class="badge badge-outline" title="Nivel de precio">${texto}</span>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TIPOS DE COCINA (lista base + cualquier valor "Otra" que se haya escrito antes)
+// ══════════════════════════════════════════════════════════════════════════════
+const BASE_COCINAS = [
+  'Argentina', 'Asiática', 'China', 'Española', 'Francesa', 'Fusión',
+  'Griega', 'Internacional', 'Italiana', 'Japonesa', 'Libanesa',
+  'Luxemburguesa', 'Mediterránea', 'Mexicana', 'Portuguesa'
+];
+
+// Combina la lista base con cualquier cocina "custom" que ya se haya guardado
+// en algún cliente (así lo que se escribe en "Otra" queda disponible después).
+// Se excluye el valor genérico "Otra" (de versiones viejas) para no duplicar
+// la opción "Otra (especificar)…".
+function getCocinaOptions() {
+  const custom = (clientes || [])
+    .map(c => (c.cocina || '').trim())
+    .filter(v => v && v.toLowerCase() !== 'otra' && v !== '__otra__' && !BASE_COCINAS.includes(v));
+  const todas = [...new Set([...BASE_COCINAS, ...custom])];
+  return todas.sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+function populateCocinaSelects() {
+  const opciones = getCocinaOptions();
+
+  // Select del formulario (nuevo/editar cliente)
+  const selForm = document.getElementById('f-cocina');
+  if (selForm) {
+    const valorActual = selForm.value;
+    selForm.innerHTML =
+      `<option value="">Seleccione…</option>` +
+      opciones.map(o => `<option>${esc(o)}</option>`).join('') +
+      `<option value="__otra__">Otra (especificar)…</option>`;
+    if (valorActual && (opciones.includes(valorActual) || valorActual === '__otra__')) {
+      selForm.value = valorActual;
+    }
+  }
+
+  // Select del filtro de la tabla
+  const selFiltro = document.getElementById('filterCocina');
+  if (selFiltro) {
+    const valorActual = selFiltro.value;
+    selFiltro.innerHTML =
+      `<option value="">Todas las cocinas</option>` +
+      opciones.map(o => `<option>${esc(o)}</option>`).join('');
+    if (valorActual && opciones.includes(valorActual)) {
+      selFiltro.value = valorActual;
+    }
+  }
+}
+
+// Muestra/oculta el campo de texto libre cuando se elige "Otra (especificar)"
+function toggleCocinaOtra() {
+  const sel = document.getElementById('f-cocina');
+  const input = document.getElementById('f-cocina-otra');
+  if (!sel || !input) return;
+  if (sel.value === '__otra__') {
+    input.classList.add('show');
+    input.focus();
+  } else {
+    input.classList.remove('show');
+    input.value = '';
+  }
+}
+
+// Carga el valor de cocina de un cliente en el formulario, contemplando
+// valores "custom" o el viejo "Otra" genérico (los muestra vía el campo libre).
+function setCocinaFormValue(valor) {
+  const sel = document.getElementById('f-cocina');
+  const input = document.getElementById('f-cocina-otra');
+  if (!sel || !input) return;
+  const v = (valor || '').trim();
+
+  if (!v) {
+    sel.value = '';
+    input.value = '';
+    input.classList.remove('show');
+    return;
+  }
+
+  const opcionesValidas = Array.from(sel.options).map(o => o.value);
+  if (v !== '__otra__' && opcionesValidas.includes(v)) {
+    sel.value = v;
+    input.value = '';
+    input.classList.remove('show');
+  } else {
+    // valor custom (o el viejo "Otra" genérico): usar el campo libre
+    sel.value = '__otra__';
+    input.value = (v.toLowerCase() === 'otra') ? '' : v;
+    input.classList.add('show');
+  }
 }
 
 function getPrioridad(cliente) {
@@ -3824,7 +3915,8 @@ function openModal(id) {
   document.getElementById('modal-title').textContent = id ? 'Editar Cliente' : 'Nuevo Cliente';
   document.getElementById('f-empresa').value   = c.empresa   || '';
   document.getElementById('f-tipo').value      = c.tipo      || '';
-  document.getElementById('f-cocina').value    = c.cocina    || '';
+  populateCocinaSelects();
+  setCocinaFormValue(c.cocina || '');
   document.getElementById('f-precio').value    = c.precio    || '';
   document.getElementById('f-pais').value      = c.pais      || '';
   document.getElementById('f-ciudad').value    = c.ciudad    || '';
@@ -3865,10 +3957,15 @@ async function saveCliente() {
 
     const clienteOriginal = editingId ? clientes.find(x => x.id === editingId) : null;
 
+    const cocinaSel = document.getElementById('f-cocina').value;
+    const cocinaFinal = cocinaSel === '__otra__'
+      ? document.getElementById('f-cocina-otra').value.trim()
+      : cocinaSel;
+
     const c = {
       empresa,
       tipo:          document.getElementById('f-tipo').value,
-      cocina:        document.getElementById('f-cocina').value,
+      cocina:        cocinaFinal,
       precio:        document.getElementById('f-precio').value ? Number(document.getElementById('f-precio').value) : null,
       pais:          document.getElementById('f-pais').value,
       ciudad:        document.getElementById('f-ciudad').value.trim(),
@@ -5738,6 +5835,7 @@ window.cambiarEstadoSheet = cambiarEstadoSheet;
 
 window.renderFinanciero = renderFinanciero;
 window.openModal        = openModal;
+window.toggleCocinaOtra = toggleCocinaOtra;
 window.closeModal       = closeModal;
 window.saveCliente      = saveCliente;
 window.deleteCliente    = deleteCliente;
