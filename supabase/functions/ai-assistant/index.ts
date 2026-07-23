@@ -81,6 +81,83 @@ const FUNCTION_DECLARATIONS = [
     },
   },
   {
+    name: "buscar_vinos",
+    description:
+      "Busca y filtra vinos activos por nombre, bodega, varietal y/o rango de precio de venta. Usar para cualquier pregunta sobre el catálogo de vinos (qué tenés, cuánto sale, de qué bodega, etc).",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        nombre: { type: "STRING", description: "Coincidencia parcial de nombre (opcional)" },
+        bodega: { type: "STRING", description: "Coincidencia parcial de bodega (opcional)" },
+        varietal: { type: "STRING", description: "Coincidencia parcial de varietal, ej: Malbec (opcional)" },
+        precio_min: { type: "NUMBER", description: "Precio de venta mínimo (opcional)" },
+        precio_max: { type: "NUMBER", description: "Precio de venta máximo (opcional)" },
+      },
+    },
+  },
+  {
+    name: "ranking_clientes_seguimientos",
+    description: "Ordena a los clientes según cuántas entradas de historial (visitas, llamadas, ventas, etc.) tienen registradas, de mayor a menor.",
+    parameters: {
+      type: "OBJECT",
+      properties: { limite: { type: "NUMBER", description: "Cantidad de resultados (default 10)" } },
+    },
+  },
+  {
+    name: "ranking_clientes_facturacion",
+    description: "Ordena a los clientes según el total facturado en ventas dentro de un rango de fechas, de mayor a menor.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        desde: { type: "STRING", description: "Fecha inicio, YYYY-MM-DD" },
+        hasta: { type: "STRING", description: "Fecha fin, YYYY-MM-DD" },
+        limite: { type: "NUMBER", description: "Cantidad de resultados (default 10)" },
+      },
+      required: ["desde", "hasta"],
+    },
+  },
+  {
+    name: "ranking_vinos_mas_vendidos",
+    description: "Ordena los vinos según unidades vendidas dentro de un rango de fechas, de mayor a menor.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        desde: { type: "STRING", description: "Fecha inicio, YYYY-MM-DD" },
+        hasta: { type: "STRING", description: "Fecha fin, YYYY-MM-DD" },
+        limite: { type: "NUMBER", description: "Cantidad de resultados (default 10)" },
+      },
+      required: ["desde", "hasta"],
+    },
+  },
+  {
+    name: "resumen_general",
+    description: "Devuelve un resumen general del CRM: total de clientes por estado, total de vinos activos/inactivos, y facturación histórica total.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
+  {
+    name: "clientes_por_filtro",
+    description: "Lista clientes filtrando por estado, país, ciudad y/o tipo de cocina (cualquier combinación, todos opcionales).",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        estado: { type: "STRING", description: "Ej: Nuevo, Interesado, Contactado, Cerrado, Inactivo" },
+        pais: { type: "STRING" },
+        ciudad: { type: "STRING" },
+        cocina: { type: "STRING" },
+      },
+    },
+  },
+  {
+    name: "buscar_en_notas",
+    description:
+      "Busca una palabra o frase dentro de las notas del historial de TODOS los clientes (visitas, llamadas, seguimientos, etc.). Útil para preguntas como '¿qué cliente dijo tal cosa?'.",
+    parameters: {
+      type: "OBJECT",
+      properties: { query: { type: "STRING", description: "Palabra o frase a buscar en las notas" } },
+      required: ["query"],
+    },
+  },
+  {
     name: "proponer_seguimiento",
     description:
       "Propone crear una nueva entrada de seguimiento/nota para un cliente. NO ejecuta el cambio: solo lo deja listo para que el usuario lo confirme en la app.",
@@ -193,6 +270,122 @@ Deno.serve(async (req: Request) => {
           if (error) throw error;
           return data;
         }
+        case "buscar_vinos": {
+          let q = supabase
+            .from("vinos")
+            .select("id, nombre, bodega, varietal, precio_venta, stock_actual")
+            .eq("inactivo", false);
+          if (args.nombre) q = q.ilike("nombre", `%${args.nombre}%`);
+          if (args.bodega) q = q.ilike("bodega", `%${args.bodega}%`);
+          if (args.varietal) q = q.ilike("varietal", `%${args.varietal}%`);
+          if (args.precio_min != null) q = q.gte("precio_venta", args.precio_min);
+          if (args.precio_max != null) q = q.lte("precio_venta", args.precio_max);
+          const { data, error } = await q.order("precio_venta", { ascending: true }).limit(50);
+          if (error) throw error;
+          return data;
+        }
+        case "buscar_en_notas": {
+          const query = (args.query || "").toLowerCase();
+          const { data, error } = await supabase.from("clientes").select("id, empresa, contacto, historial");
+          if (error) throw error;
+          const matches: any[] = [];
+          for (const c of data) {
+            for (const h of c.historial || []) {
+              if (h.nota && String(h.nota).toLowerCase().includes(query)) {
+                matches.push({
+                  clienteId: c.id,
+                  empresa: c.empresa,
+                  contacto: c.contacto,
+                  fecha: h.fecha,
+                  nota: h.nota,
+                });
+              }
+            }
+          }
+          matches.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+          return matches.slice(0, 20);
+        }
+        case "ranking_clientes_seguimientos": {
+          const limite = args.limite ?? 10;
+          const { data, error } = await supabase.from("clientes").select("id, empresa, contacto, historial");
+          if (error) throw error;
+          const ranked = data
+            .map((c: any) => ({
+              clienteId: c.id,
+              empresa: c.empresa,
+              contacto: c.contacto,
+              cantidadSeguimientos: (c.historial || []).length,
+            }))
+            .sort((a: any, b: any) => b.cantidadSeguimientos - a.cantidadSeguimientos)
+            .slice(0, limite);
+          return ranked;
+        }
+        case "ranking_clientes_facturacion": {
+          const limite = args.limite ?? 10;
+          const { data, error } = await supabase
+            .from("ventas")
+            .select("cliente_id, cliente_nombre, total")
+            .gte("fecha", args.desde)
+            .lte("fecha", args.hasta);
+          if (error) throw error;
+          const porCliente: Record<string, { clienteId: string; empresa: string; total: number }> = {};
+          for (const v of data) {
+            const key = v.cliente_id;
+            if (!porCliente[key]) porCliente[key] = { clienteId: key, empresa: v.cliente_nombre, total: 0 };
+            porCliente[key].total += Number(v.total || 0);
+          }
+          return Object.values(porCliente).sort((a, b) => b.total - a.total).slice(0, limite);
+        }
+        case "ranking_vinos_mas_vendidos": {
+          const limite = args.limite ?? 10;
+          const { data, error } = await supabase
+            .from("ventas")
+            .select("vino_nombre, cantidad")
+            .gte("fecha", args.desde)
+            .lte("fecha", args.hasta);
+          if (error) throw error;
+          const porVino: Record<string, number> = {};
+          for (const v of data) {
+            porVino[v.vino_nombre] = (porVino[v.vino_nombre] || 0) + Number(v.cantidad || 0);
+          }
+          return Object.entries(porVino)
+            .map(([vino, cantidad]) => ({ vino, cantidad }))
+            .sort((a, b) => b.cantidad - a.cantidad)
+            .slice(0, limite);
+        }
+        case "resumen_general": {
+          const [{ data: clientesData, error: errC }, { data: vinosData, error: errV }, { data: ventasData, error: errVe }] =
+            await Promise.all([
+              supabase.from("clientes").select("estado"),
+              supabase.from("vinos").select("inactivo"),
+              supabase.from("ventas").select("total"),
+            ]);
+          if (errC) throw errC;
+          if (errV) throw errV;
+          if (errVe) throw errVe;
+          const clientesPorEstado: Record<string, number> = {};
+          for (const c of clientesData) clientesPorEstado[c.estado || "Sin estado"] = (clientesPorEstado[c.estado || "Sin estado"] || 0) + 1;
+          const vinosActivos = vinosData.filter((v: any) => !v.inactivo).length;
+          const vinosInactivos = vinosData.filter((v: any) => v.inactivo).length;
+          const facturacionHistorica = ventasData.reduce((s: number, v: any) => s + Number(v.total || 0), 0);
+          return {
+            totalClientes: clientesData.length,
+            clientesPorEstado,
+            vinosActivos,
+            vinosInactivos,
+            facturacionHistoricaTotal: facturacionHistorica,
+          };
+        }
+        case "clientes_por_filtro": {
+          let q = supabase.from("clientes").select("id, empresa, contacto, estado, pais, ciudad, cocina");
+          if (args.estado) q = q.ilike("estado", `%${args.estado}%`);
+          if (args.pais) q = q.ilike("pais", `%${args.pais}%`);
+          if (args.ciudad) q = q.ilike("ciudad", `%${args.ciudad}%`);
+          if (args.cocina) q = q.ilike("cocina", `%${args.cocina}%`);
+          const { data, error } = await q.limit(50);
+          if (error) throw error;
+          return data;
+        }
         default:
           throw new Error("Herramienta desconocida: " + name);
       }
@@ -227,14 +420,14 @@ Deno.serve(async (req: Request) => {
       const functionCallPart = parts.find((p: any) => p.functionCall);
 
       if (!functionCallPart) {
-        const text = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n");
+        const text = parts.filter((p: any) => p.text && !p.thought).map((p: any) => p.text).join("\n");
         return json({ type: "final", text });
       }
 
       const { name, args } = functionCallPart.functionCall;
 
       if (WRITE_TOOLS.has(name)) {
-        const textSoFar = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n");
+        const textSoFar = parts.filter((p: any) => p.text && !p.thought).map((p: any) => p.text).join("\n");
         return json({ type: "action_proposal", text: textSoFar, tool_name: name, input: args });
       }
 
@@ -245,10 +438,10 @@ Deno.serve(async (req: Request) => {
         result = { error: String(e) };
       }
 
-      // Agregamos el turno del modelo (con su function call) y la respuesta de la función
-      contents.push({ role: "model", parts: [{ functionCall: { name, args } }] });
+      // Reenviamos el turno del modelo tal cual lo devolvió (preserva thought_signature)
+      contents.push(candidate.content);
       contents.push({
-        role: "function",
+        role: "user",
         parts: [{ functionResponse: { name, response: { result } } }],
       });
     }
