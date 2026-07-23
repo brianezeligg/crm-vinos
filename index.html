@@ -2781,6 +2781,34 @@ transition:.2s;
 
 </div><!-- .app -->
 
+<!-- ── Asistente IA ─────────────────────────────────────────────────────── -->
+<button id="ai-fab" onclick="toggleAiPanel()" title="Asistente IA"
+  style="position:fixed;bottom:1.5rem;right:1.5rem;width:56px;height:56px;border-radius:50%;
+         background:var(--primary);color:#fff;border:none;box-shadow:0 6px 16px rgba(0,0,0,.25);
+         font-size:1.4rem;cursor:pointer;z-index:1200;display:flex;align-items:center;justify-content:center;">
+  💬
+</button>
+
+<div id="ai-panel" style="display:none;position:fixed;bottom:5.5rem;right:1.5rem;width:min(380px,92vw);
+     height:min(560px,75vh);background:var(--card);border:1px solid var(--border);border-radius:14px;
+     box-shadow:0 12px 32px rgba(0,0,0,.22);z-index:1200;display:flex;flex-direction:column;overflow:hidden;">
+  <div style="background:var(--primary);color:#fff;padding:.85rem 1rem;display:flex;justify-content:space-between;align-items:center;">
+    <strong style="font-size:.95rem;">Asistente del CRM</strong>
+    <button onclick="toggleAiPanel()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;">✕</button>
+  </div>
+  <div id="ai-messages" style="flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.6rem;font-size:.88rem;">
+    <div style="align-self:flex-start;background:var(--bg-secondary);border-radius:10px;padding:.55rem .75rem;max-width:88%;">
+      Hola 👋 Puedo buscar clientes, resumir ventas, avisar de stock bajo o proponerte crear un seguimiento. ¿En qué te ayudo?
+    </div>
+  </div>
+  <div style="padding:.6rem;border-top:1px solid var(--border);display:flex;gap:.5rem;">
+    <input id="ai-input" type="text" placeholder="Escribí tu consulta…" autocomplete="off"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();sendAiMessage();}"
+      style="flex:1;border:1px solid var(--border);border-radius:8px;padding:.5rem .6rem;font-size:.88rem;">
+    <button class="btn btn-primary" style="padding:.5rem .9rem;" onclick="sendAiMessage()">➤</button>
+  </div>
+</div>
+
 <script type="module">
 
 import { supabase } from './supabase.js'
@@ -2788,6 +2816,137 @@ import { supabase } from './supabase.js'
 window.login = login;
 window.logout = logout;
 window.toggleDarkMode = toggleDarkMode;
+window.toggleAiPanel = toggleAiPanel;
+window.sendAiMessage = sendAiMessage;
+
+let aiHistory = [];
+let aiBusy = false;
+
+function toggleAiPanel() {
+  const panel = document.getElementById('ai-panel');
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') document.getElementById('ai-input')?.focus();
+}
+
+function aiAppendMessage(text, who = 'bot', opts = {}) {
+  const box = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.style.cssText = who === 'user'
+    ? 'align-self:flex-end;background:var(--primary);color:#fff;border-radius:10px;padding:.55rem .75rem;max-width:88%;white-space:pre-wrap;'
+    : 'align-self:flex-start;background:var(--bg-secondary);border-radius:10px;padding:.55rem .75rem;max-width:88%;white-space:pre-wrap;';
+  div.textContent = text;
+  box.appendChild(div);
+
+  if (opts.confirmAction) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'align-self:flex-start;display:flex;gap:.4rem;';
+    wrap.innerHTML = `
+      <button class="btn btn-primary" style="padding:.35rem .7rem;font-size:.8rem;">Confirmar</button>
+      <button class="btn btn-outline" style="padding:.35rem .7rem;font-size:.8rem;">Descartar</button>
+    `;
+    const [confirmBtn, cancelBtn] = wrap.querySelectorAll('button');
+    confirmBtn.onclick = () => { wrap.remove(); executeAiAction(opts.confirmAction); };
+    cancelBtn.onclick  = () => { wrap.remove(); aiAppendMessage('Acción descartada.', 'bot'); };
+    box.appendChild(wrap);
+  }
+  box.scrollTop = box.scrollHeight;
+  return div;
+}
+
+async function sendAiMessage() {
+  if (aiBusy) return;
+  const input = document.getElementById('ai-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  aiAppendMessage(text, 'user');
+  aiHistory.push({ role: 'user', content: text });
+  aiBusy = true;
+  const loadingEl = aiAppendMessage('Pensando…', 'bot');
+
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      body: { messages: aiHistory }
+    });
+    loadingEl.remove();
+
+    if (error || !data || data.error) {
+      aiAppendMessage('Hubo un error consultando al asistente. Probá de nuevo en un momento.', 'bot');
+      console.error(error || data?.error);
+      return;
+    }
+
+    if (data.type === 'action_proposal') {
+      if (data.text) aiAppendMessage(data.text, 'bot');
+      aiHistory.push({ role: 'assistant', content: data.text || '(propone una acción)' });
+      aiAppendMessage(describeAiAction(data.tool_name, data.input), 'bot', { confirmAction: data });
+    } else {
+      aiAppendMessage(data.text || '(sin respuesta)', 'bot');
+      aiHistory.push({ role: 'assistant', content: data.text || '' });
+    }
+  } catch (err) {
+    loadingEl.remove();
+    aiAppendMessage('Hubo un error de conexión con el asistente.', 'bot');
+    console.error(err);
+  } finally {
+    aiBusy = false;
+  }
+}
+
+function describeAiAction(toolName, input) {
+  if (toolName === 'proponer_seguimiento') {
+    return `¿Confirmás crear este seguimiento?\nVía: ${input.via || '—'}\nNota: ${input.nota}` +
+      (input.proximo ? `\nPróximo seguimiento: ${input.proximo}` : '');
+  }
+  if (toolName === 'proponer_cambio_estado') {
+    return `¿Confirmás cambiar el estado del cliente a "${input.estado}"?`;
+  }
+  return 'El asistente propone una acción.';
+}
+
+async function executeAiAction(proposal) {
+  try {
+    if (proposal.tool_name === 'proponer_seguimiento') {
+      const cliente = clientes.find(c => c.id === proposal.input.cliente_id);
+      if (!cliente) { aiAppendMessage('No encontré ese cliente para actualizarlo.', 'bot'); return; }
+
+      const { data: userData } = await supabase.auth.getUser();
+      const entry = {
+        id: crypto.randomUUID(),
+        fecha: new Date().toISOString().slice(0, 10),
+        via: proposal.input.via || 'Otro',
+        nota: proposal.input.nota,
+        tipoMovimiento: 'Seguimiento',
+        ventas: [],
+        total_general: 0,
+        vendedor: userData.user?.user_metadata?.nombre || userData.user?.email || 'Asistente IA',
+        timestamp: new Date().toISOString()
+      };
+      const hist = [entry, ...(cliente.historial || [])];
+
+      const { error } = await supabase.from('clientes').update({
+        historial: hist,
+        proximo: proposal.input.proximo || cliente.proximo
+      }).eq('id', cliente.id);
+
+      if (error) { aiAppendMessage('No se pudo guardar el seguimiento.', 'bot'); console.error(error); return; }
+      await loadClientes();
+      aiAppendMessage('✅ Seguimiento creado.', 'bot');
+
+    } else if (proposal.tool_name === 'proponer_cambio_estado') {
+      const { error } = await supabase.from('clientes')
+        .update({ estado: proposal.input.estado })
+        .eq('id', proposal.input.cliente_id);
+
+      if (error) { aiAppendMessage('No se pudo cambiar el estado.', 'bot'); console.error(error); return; }
+      await loadClientes();
+      aiAppendMessage('✅ Estado actualizado.', 'bot');
+    }
+  } catch (err) {
+    console.error(err);
+    aiAppendMessage('Ocurrió un error ejecutando la acción.', 'bot');
+  }
+}
 
 loadDarkMode();
 
