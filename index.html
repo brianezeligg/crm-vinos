@@ -4071,7 +4071,7 @@ function openSheet(id) {
             <div class="historial-ventas">
               ${h.ventas.map(vv => `
                 <div class="historial-venta-row">
-                  <span>${esc(vv.vinoNombre)} × ${vv.cantidad}</span>
+                  <span>${esc(vv.vinoNombre)} × ${vv.cantidad}${vv.descuentoPct ? ` <span style="font-size:.7rem;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:.05rem .4rem;margin-left:.25rem;">-${vv.descuentoPct}%</span>` : ''}</span>
                   ${esFacturableH ? `<span>€ ${Number(vv.total || 0).toFixed(2)}</span>`
                   : esDev ? `<span style="color:#075985">€ ${calcPrecioDevolucion(vv).toFixed(2)} /u</span>`
                   : `<span class="td-muted">sin facturar</span>`}
@@ -4432,8 +4432,9 @@ async function saveNewContact() {
     const esFacturable = tipoMov === 'Venta';
 
     for (const line of wineLines) {
-      const vinoId   = line.querySelector('.wine-vino').value;
-      const cantidad = Number(line.querySelector('.wine-cantidad').value || 0);
+      const vinoId       = line.querySelector('.wine-vino').value;
+      const cantidad     = Number(line.querySelector('.wine-cantidad').value || 0);
+      const descuentoPct = Math.min(100, Math.max(0, Number(line.querySelector('.wine-descuento')?.value || 0)));
       if (!vinoId || cantidad <= 0) continue;
       const vino = vinos.find(v => v.id === vinoId);
       if (!vino) continue;
@@ -4442,10 +4443,17 @@ async function saveNewContact() {
         alert(`No hay stock suficiente para ${vino.nombre}`); return;
       }
 
-      const precio = esFacturable ? Number(vino.precio_venta || 0) : esDevolucion ? Number(vino.precio_venta || 0) : 0;
+      const precioBase = Number(vino.precio_venta || 0);
+      // El descuento solo se aplica al precio de venta facturado
+      const precio = esFacturable
+        ? (descuentoPct > 0 ? precioBase * (1 - descuentoPct / 100) : precioBase)
+        : (esDevolucion ? precioBase : 0);
       const total  = precio * cantidad;
       totalGeneral += total;
-      ventasLineas.push({ vinoId, vinoNombre: vino.nombre, cantidad, precio, total, tipoMov });
+      ventasLineas.push({
+        vinoId, vinoNombre: vino.nombre, cantidad, precio, total, tipoMov,
+        ...(esFacturable && descuentoPct > 0 ? { descuentoPct, precioOriginal: precioBase } : {})
+      });
     }
 
     const userData = await supabase.auth.getUser();
@@ -4618,6 +4626,10 @@ function editHistorial(clienteId, historialId) {
               <input type="number" class="edit-cantidad" value="${v.cantidad}" min="1">
             </div>
           </div>
+          <div class="form-group">
+            <label>Descuento (%)</label>
+            <input type="number" class="edit-descuento" value="${v.descuentoPct || 0}" min="0" max="100" step="1" placeholder="0">
+          </div>
           <button type="button" class="btn btn-ghost" style="color:#b91c1c"
             onclick="this.closest('.edit-wine-line').remove()">
             Eliminar vino
@@ -4764,6 +4776,10 @@ function addWineLine() {
           <input type="number" class="wine-cantidad" value="1" min="1" oninput="updateWineInfo(this)">
         </div>
       </div>
+      <div class="form-group">
+        <label>Descuento (%)</label>
+        <input type="number" class="wine-descuento" value="0" min="0" max="100" step="1" placeholder="0" oninput="updateWineInfo(this)">
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;">
         <div class="form-group">
           <label>P. Compra</label>
@@ -4858,8 +4874,11 @@ function updateGrandTotal() {
 function updateWineInfo(element) {
   const line     = element.closest('.wine-line');
   if (!line) return;
-  const vinoId   = line.querySelector('.wine-vino').value;
-  const cantidad = Number(line.querySelector('.wine-cantidad').value || 0);
+  const vinoId    = line.querySelector('.wine-vino').value;
+  const cantidad  = Number(line.querySelector('.wine-cantidad').value || 0);
+  const descEl    = line.querySelector('.wine-descuento');
+  let   descuento = Math.min(100, Math.max(0, Number(descEl?.value || 0)));
+  if (descEl && descEl.value !== '' && Number(descEl.value) !== descuento) descEl.value = descuento;
   const precioEl = line.querySelector('.wine-precio');
   const compraEl = line.querySelector('.wine-compra');
   const totalEl  = line.querySelector('.wine-total');
@@ -4874,14 +4893,17 @@ function updateWineInfo(element) {
     precioEl.value = ''; compraEl.value = ''; totalEl.value = ''; ganEl.value = '';
     updateGrandTotal(); return;
   }
-  const vino    = vinos.find(v => v.id === vinoId);
+  const vino        = vinos.find(v => v.id === vinoId);
   if (!vino) return;
-  const precio  = Number(vino.precio_venta  || 0);
-  const compra  = Number(vino.precio_compra || 0);
-  const total   = esFact ? precio * cantidad : 0;
-  const ganancia= esFact ? (precio - compra) * cantidad : 0;
+  const precioBase   = Number(vino.precio_venta  || 0);
+  const compra        = Number(vino.precio_compra || 0);
+  const precioFinal   = descuento > 0 ? precioBase * (1 - descuento / 100) : precioBase;
+  const total         = esFact ? precioFinal * cantidad : 0;
+  const ganancia      = esFact ? (precioFinal - compra) * cantidad : 0;
 
-  precioEl.value = esFact ? `€ ${precio.toFixed(2)}` : '—';
+  precioEl.value = esFact
+    ? (descuento > 0 ? `€ ${precioFinal.toFixed(2)} (-${descuento}%)` : `€ ${precioFinal.toFixed(2)}`)
+    : '—';
   compraEl.value = `€ ${compra.toFixed(2)}`;
   totalEl.value  = esFact ? `€ ${total.toFixed(2)}` : '—';
   ganEl.value    = esFact ? `${ganancia >= 0 ? '+' : ''}€ ${ganancia.toFixed(2)}` : '—';
@@ -5640,6 +5662,11 @@ function addEditWineLine() {
 
       </div>
 
+      <div class="form-group">
+        <label>Descuento (%)</label>
+        <input type="number" class="edit-descuento" value="0" min="0" max="100" step="1" placeholder="0">
+      </div>
+
       <button
         type="button"
         class="btn btn-ghost"
@@ -5709,8 +5736,9 @@ async function saveEditedHistory() {
   const lines = [...document.querySelectorAll('.edit-wine-line')];
 
   for (const line of lines) {
-    const vinoId  = line.querySelector('.edit-vino').value;
-    const cantidad = Number(line.querySelector('.edit-cantidad').value || 0);
+    const vinoId       = line.querySelector('.edit-vino').value;
+    const cantidad     = Number(line.querySelector('.edit-cantidad').value || 0);
+    const descuentoPct = Math.min(100, Math.max(0, Number(line.querySelector('.edit-descuento')?.value || 0)));
     const vino = vinos.find(v => v.id === vinoId);
     if (!vino || cantidad <= 0) continue;
 
@@ -5721,13 +5749,17 @@ async function saveEditedHistory() {
       return;
     }
 
-    const precio = esFacturableNuevo ? Number(vino.precio_venta || 0) : esDevolucionNuevo ? Number(vino.precio_venta || 0) : 0;
+    const precioBase = Number(vino.precio_venta || 0);
+    const precio = esFacturableNuevo
+      ? (descuentoPct > 0 ? precioBase * (1 - descuentoPct / 100) : precioBase)
+      : (esDevolucionNuevo ? precioBase : 0);
     nuevasVentas.push({
       vinoId,
       vinoNombre: vino.nombre,
       cantidad,
       precio,
-      total: precio * cantidad
+      total: precio * cantidad,
+      ...(esFacturableNuevo && descuentoPct > 0 ? { descuentoPct, precioOriginal: precioBase } : {})
     });
 
     // Aplicar efecto en stock
