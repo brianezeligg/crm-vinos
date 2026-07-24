@@ -2827,6 +2827,9 @@ function toggleAiPanel() {
   panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
   if (panel.style.display === 'flex') document.getElementById('ai-input')?.focus();
 }
+// Aseguramos que el panel arranque siempre cerrado al cargar/iniciar sesión,
+// sin importar cualquier estado que haya quedado de antes.
+document.getElementById('ai-panel')?.style.setProperty('display', 'none');
 
 function aiAppendMessage(text, who = 'bot', opts = {}) {
   const box = document.getElementById('ai-messages');
